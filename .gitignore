@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 
 # models
-model_*/
+weights/
 
 # data
 data/
