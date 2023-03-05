@@ -48,7 +48,7 @@ class Optimizer(object):
         def objective(trial):
             configs = {
 
-                "method": trial.suggest_categorical("method", ["hierbert", "max_pooling", "bow", "model_01", "model_02", "model_03"]),
+                "method": trial.suggest_categorical("method", ["model_01", "model_02", "model_03"]),
 
                 "learning_rate": 10**trial.suggest_float("lr_exp", -4, -2),
 

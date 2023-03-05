@@ -178,9 +178,8 @@ def train_with_accumulation(model, train_loader, val_loader, config,
         correct = 0
         model.train()
         with tqdm(train_loader, unit="batch") as tepoch:
-            acc_step = 0
             optimizer.zero_grad()
-            for batch in tepoch:
+            for idx, batch in enumerate(tepoch):
                 # tqdm desc
                 tepoch.set_description(f"Epoch {epoch}")
                 X_ind = batch["X_ind"].to(device)
@@ -201,12 +200,6 @@ def train_with_accumulation(model, train_loader, val_loader, config,
                 output = model(X_text, X_mask, X_ind)
                 # print(output)
                 loss = criterion(output, y)
-                loss.backward()
-                acc_step += 1
-                if acc_step % acc_steps == 0:
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    acc_step = 0
 
                 # Computing predictions
                 batch_size_ = y.size(0)
@@ -215,6 +208,13 @@ def train_with_accumulation(model, train_loader, val_loader, config,
                 total_loss += loss.item() * batch_size_
                 total_entries += batch_size_
 
+                loss = loss / acc_steps
+                loss.backward()
+
+                if (idx+1) % acc_steps == 0 or (idx+1 == len(train_loader)):
+                    optimizer.step()
+                    optimizer.zero_grad()
+                
                 # del X_ecb, X_ecb_att, X_fed, X_fed_att, X_ind, y, batch
                 gc.collect()
                 torch.cuda.empty_cache()
