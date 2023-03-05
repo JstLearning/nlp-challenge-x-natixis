@@ -24,7 +24,7 @@ def evaluate(model, val_loader, config, device):
                 tepoch.set_description("Evaluation")
 
                 X_ind = batch["X_ind"].to(device)
-                y = batch["label"]
+                y = batch["label"].to(device)
 
                 if config["separate"]:
                     X_ecb = batch["X_ecb"].to(device)
