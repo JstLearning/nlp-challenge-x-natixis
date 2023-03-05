@@ -78,7 +78,7 @@ class AttentionWithContext(nn.Module):
         if mask is not None:
             #TODO: Treat case if all masks are False.
             # Not impossible if all inputs are invalid (example: blank inputs)
-            a = a*mask.double()
+            a = a*mask.float()
         
         # in some cases especially in the early stages of training the sum may be almost zero
         # and this results in NaN's. A workaround is to add a very small positive number ε to the sum.
@@ -90,61 +90,69 @@ class AttentionWithContext(nn.Module):
         else:
             return weighted_input ### attentional vector only ###
         
-    
-
-class DocumentEncoder(nn.Module):
-    def __init__(self, return_coefficients=False, bias=True, dropout=0):
-        super(DocumentEncoder, self).__init__()
-        self.text_encoder = DistilBertModel.from_pretrained("distilbert-base-uncased")
-        self.bigru = nn.GRU(input_size=768,
-                          hidden_size=32,
+class AttentionBiGRU(nn.Module):
+    def __init__(self, input_shape, output_shape_2, dropout=0, bias=True):
+        super(AttentionBiGRU, self).__init__()
+        self.dropout = nn.Dropout(dropout)
+        self.bigru = nn.GRU(input_size=input_shape,
+                          hidden_size=output_shape_2,
                           num_layers=1,
                           bias=bias,
                           batch_first=True,
                           bidirectional=True)
-        self.attention = AttentionWithContext(
-            input_shape=64,  return_coefficients=return_coefficients, bias=bias)
+        self.attention = AttentionWithContext(2*output_shape_2, return_coefficients=False, bias=bias)
+
+    def forward(self, x, mask=None):
+        x, _ = self.bigru(x)
+        x = self.dropout(x)
+        x = self.attention(x, mask)
+        return x
+
+class DocumentEncoder(nn.Module):
+    def __init__(self, hidden_dim = 64, bias=True, dropout=.5):
+        super(DocumentEncoder, self).__init__()
+        self.text_encoder = DistilBertModel.from_pretrained("distilbert-base-uncased")
         self.dropout = nn.Dropout(dropout)
-    
     def forward(self, x, attention_mask=None):
         # Get a word embedding first. x is of shape (samples, steps=512)
         # attention_mask is of same size.
         x = self.text_encoder(x, attention_mask=attention_mask).last_hidden_state
         # x needs to have shape: (samples, steps=512, features=768)
-        x, _ = self.bigru(x)
-        # x needs to have shape: (samples, steps=512, features=64)
+        # the mask needs to have shape: (samples, steps=512, 1)
+        # To retrieve the embedding of the CLS token, we will just take the first step
+        # of every document.
+        x = x[:, 0, :]
         x = self.dropout(x)
-        x = self.attention(x)
-        # x is now of size (samples, features=64) and represents a document.
+        # x needs to have shape: (samples, features=768)
+        # x is now of size (samples, features=768) and represents a document.
         return x
 
 class CorpusEncoder(nn.Module):
-    def __init__(self, return_coefficients=False, bias=True, dropout=0.):
+    def __init__(self, bias=True, dropout=.5):
         super(CorpusEncoder, self).__init__()
-        self.doc_encoder = DocumentEncoder(return_coefficients=False, bias=True, dropout=dropout)
-        self.W = nn.Linear(in_features=64, out_features=32)
-        self.dropout = nn.Dropout(dropout)
-        self.attention = AttentionWithContext(
-            input_shape=32,  return_coefficients=False, bias=bias)
+        self.doc_encoder = DocumentEncoder(bias=bias)
+        self.W = nn.Linear(in_features=768, out_features=32)
         self.corpus_emb_dim = 32
+        self.dropout = nn.Dropout(dropout)
     
     def forward(self, x, attention_mask=None):
         # Get a document embedding first.
-        # x and attention_mask are of size: (samples, nb_docs=4, steps=512)
+        # x and attention_mask are of size: (samples, nb_docs, steps=512)
         # We can reshape this into (samples * nb_docs, steps=512)
         batch_size, nb_docs = x.size(0), x.size(1)
         x = x.view(batch_size * nb_docs, -1)
         attention_mask_ = attention_mask.view(batch_size * nb_docs, -1)
+        # print("mask : ", attention_mask.size())
+        # print("Encode document")
         x = self.doc_encoder(x, attention_mask_)
-        # x is now in shape (samples * nb_docs, features=64)
-        x = self.W(x)
-        x = self.dropout(x)
-        # x is now in shape (samples * nb_docs, features=32)
+        # x is now in shape (samples * nb_docs, features=768)
         x = x.view(batch_size, nb_docs, -1)
-        # x is now of shape: (samples, steps=nb_docs=4, features=32)
+        # x is once again in shape (samples, nb_docs, features=768)
+        # We reduce the nb of docs with max pooling.
+
         # Note : About Corpus encoding
         # In order to filter out empty entries, we can use the previous attention mask.
-        # The original mask is of size (batch_size, 4, 512) in the form:
+        # The original mask is of size (batch_size, steps, 512) in the form:
         # [
         # [[1, 1, 1, 1, ..., 1, 1, 1, 1],
         # [1, 1, 1, 1, ..., 1, 1, 1, 1]
@@ -153,7 +161,7 @@ class CorpusEncoder(nn.Module):
         # ...,
         # ]
         # Therefore, we can filter the useless entries by using a mask
-        # sum > 2. The new mask will then be of size (batch_size, 4, 1)
+        # sum > 2. The new mask will then be of size (batch_size, steps, 1)
         # [
         # [[True],
         #  [True]
@@ -161,41 +169,16 @@ class CorpusEncoder(nn.Module):
         #  [False]],
         # ...,
         # ]
-        attention_mask = torch.sum(attention_mask, dim=-1, keepdim=True).ge(3)
-        x = self.attention(x, mask=attention_mask)
+        # print("Encode corpus")
+        # attention_mask = torch.sum(attention_mask, dim=-1, keepdim=True).ge(3)
+        
+        # Max pooling ([0] to get values only, we don't care about indices)
+        # We set the masked entries to minus infinity, so that they are discarded by max pooling.
+        x = torch.max(x, dim=1)[0]
+
+
+
+        # x is now of size (samples, features=768)
+        x = self.W(x)
         # x is now of size (samples, features=32) and represents a corpus.
         return x
-
-class MyModel(nn.Module):
-    def __init__(self, dropout=.5):
-        super(MyModel, self).__init__()
-        self.corpus_enc_ecb = CorpusEncoder(dropout=dropout)
-        self.corpus_enc_fed = CorpusEncoder(dropout=dropout)
-        nb_nontext_features = len(nontextual_cols)
-        self.fc1 = nn.Linear(32 * 2 + nb_nontext_features, 64)
-        self.fc2 = nn.Linear(64, 16)
-        self.fc3 = nn.Linear(16, 1)
-        self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
-    
-    def forward(self, x_ecb, x_ecb_mask, x_fed, x_fed_mask, x_ind):
-        # x_fed and x_ind of size (batch_size, 4, 512)
-
-        x_ecb = self.corpus_enc_ecb(x_ecb, attention_mask=x_ecb_mask)
-        x_fed = self.corpus_enc_fed(x_fed, attention_mask=x_fed_mask)
-
-        # Both of the above are now of size (batch_size, features)
-        # Cast to float because for some reason cat converts to dtype float64.
-        # float converts to float32.
-        x = torch.cat([x_ecb, x_fed, x_ind], dim=1).float()
-        # x is now of size (batch_size, 2 * features + x_ind.size(1))
-        # Classification
-        # print(x.dtype)
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.fc2(x)
-        x = self.relu(x)
-        x = self.fc3(x)
-        out = self.sigmoid(x)
-
-        return out
