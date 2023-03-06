@@ -1,0 +1,15 @@
+##### Core scientific packages
+jupyter
+matplotlib
+numpy
+pandas
+scipy
+seaborn
+scikit-learn
+
+tqdm
+nltk
+transformers
+optuna
+langdetect
+huggingface_hub
