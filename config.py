@@ -82,7 +82,7 @@ class Optimizer(object):
             model = MyModel(method=configs["method"],
                             layers=configs["layers"],
                             separate=configs["separate"],
-                            dropout=configs["dropout"])
+                            dropout=configs["dropout"]).to(device)
             self.attempts += 1
             eval_losses, eval_accus, eval_f1s = \
                 train(model, train_loader=train_loader, val_loader=val_loader,

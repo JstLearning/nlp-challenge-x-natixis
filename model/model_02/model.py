@@ -133,7 +133,7 @@ class CorpusEncoder(nn.Module):
         super(CorpusEncoder, self).__init__()
         self.doc_encoder = DocumentEncoder(bias=bias)
         self.W = nn.Linear(in_features=128, out_features=32)
-        self.corpus_emb_dim = 16
+        self.corpus_emb_dim = 32
         self.att_bigru = AttentionBiGRU(
             input_shape=32, output_shape_2=self.corpus_emb_dim//2,
             bias=bias, dropout=dropout

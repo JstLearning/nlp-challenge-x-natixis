@@ -215,7 +215,7 @@ class CorpusEncoder(nn.Module):
                 self.encoder_ecb = CorpusEncoder01(dropout=dropout)
                 self.encoder_fed = CorpusEncoder01(dropout=dropout)
         elif self.method=='model_02':
-            self.corpus_emb_dim = 16 * (1 + int(separate))
+            self.corpus_emb_dim = 32 * (1 + int(separate))
             if not separate:
                 self.encoder = CorpusEncoder02(dropout=dropout)
                 self.encoder_ecb = None
