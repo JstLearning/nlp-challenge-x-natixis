@@ -6,36 +6,36 @@ channels:
   - huggingface
   - defaults
 dependencies:
-  - openssl=1.1.1q=h2bbff1b_0
-  - pyopenssl=22.0.0=pyhd3eb1b0_0
-  - numpy=1.21.5=py39h7a0a035_3
-  - numba=0.55.1=py39hf11a4ad_0
-  - pytorch=1.13.1=py3.9_cuda11.7_cudnn8_0
-  - pytorch-cuda=11.7=h67b0de4_1
+  - openssl=1.1.1q
+  - pyopenssl=22.0.0
+  - numpy=1.21.5
+  - numba=0.55.1
+  - pytorch=1.13.1
+  - pytorch-cuda=11.7
   - pytorch-mutex=1.0=cuda
-  - scikit-learn=1.0.2=py39hf11a4ad_1
-  - pandas=1.4.4=py39hd77b12b_0
-  - tqdm=4.64.1=py39haa95532_0
-  - re2=2022.04.01=hd77b12b_0
-  - regex=2022.7.9=py39h2bbff1b_0
-  - requests=2.28.1=py39haa95532_0
-  - optuna=2.10.1=pyhd8ed1ab_0
-  - pathlib=1.0.1=pyhd3eb1b0_1
-  - joblib=1.1.0=pyhd3eb1b0_0
-  - json5=0.9.6=pyhd3eb1b0_0
-  - jsonschema=4.16.0=py39haa95532_0
-  - jupyter=1.0.0=py39haa95532_8
-  - jupyter_client=7.3.4=py39haa95532_0
-  - jupyter_console=6.4.3=pyhd3eb1b0_0
-  - jupyter_core=4.11.1=py39haa95532_0
-  - jupyter_server=1.18.1=py39haa95532_0
-  - jupyterlab=3.4.4=py39haa95532_0
-  - jupyterlab_pygments=0.1.2=py_0
-  - jupyterlab_server=2.10.3=pyhd3eb1b0_1
-  - jupyterlab_widgets=1.0.0=pyhd3eb1b0_1
-  - markdown=3.3.4=py39haa95532_0
-  - markupsafe=2.0.1=py39h2bbff1b_0
-  - matplotlib=3.5.2=py39haa95532_0
-  - nltk=3.7=pyhd3eb1b0_0
-  - transformers=4.21.0=py_0
+  - scikit-learn=1.0.2
+  - pandas=1.4.4
+  - tqdm=4.64.1
+  - re2=2022.04.01
+  - regex=2022.7.9
+  - requests=2.28.1
+  - optuna=2.10.1
+  - pathlib=1.0.1
+  - joblib=1.1.0
+  - json5=0.9.6
+  - jsonschema=4.16.0
+  - jupyter=1.0.0
+  - jupyter_client=7.3.4
+  - jupyter_console=6.4.3
+  - jupyter_core=4.11.1
+  - jupyter_server=1.18.1
+  - jupyterlab=3.4.4
+  - jupyterlab_pygments=0.1.2
+  - jupyterlab_server=2.10.3
+  - jupyterlab_widgets=1.0.0
+  - markdown=3.3.4
+  - markupsafe=2.0.1
+  - matplotlib=3.5.2
+  - nltk=3.7
+  - transformers=4.21.0
   - langdetect
