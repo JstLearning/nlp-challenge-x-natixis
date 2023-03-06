@@ -38,3 +38,4 @@ dependencies:
   - matplotlib=3.5.2=py39haa95532_0
   - nltk=3.7=pyhd3eb1b0_0
   - transformers=4.21.0=py_0
+  - langdetect
