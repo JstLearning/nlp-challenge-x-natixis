@@ -9,7 +9,7 @@ from train import train, evaluate
 import torch
 import torch.nn as nn
 
-config = {
+config_dummy = {
 
     "method": "model_01",
 
@@ -66,15 +66,15 @@ class Optimizer(object):
 
 
             train_set, train_loader, tokenizer, steps = get_data_loader(
-            returns_train, ecb, fed, y_train, method=config["method"],
-            separate=config["separate"], max_corpus_len=config["max_corpus_len"],
-            batch_size=config["batch_size"]
+            returns_train, ecb, fed, y_train, method=configs["method"],
+            separate=configs["separate"], max_corpus_len=configs["max_corpus_len"],
+            batch_size=configs["batch_size"]
             )
 
             val_set, val_loader, tokenizer, steps = get_data_loader(
-                returns_val, ecb, fed, y_val, method=config["method"],
-                separate=config["separate"], max_corpus_len=config["max_corpus_len"],
-                batch_size=config["batch_size"]
+                returns_val, ecb, fed, y_val, method=configs["method"],
+                separate=configs["separate"], max_corpus_len=configs["max_corpus_len"],
+                batch_size=configs["batch_size"]
             )
 
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
