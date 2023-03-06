@@ -16,13 +16,13 @@ import torch.nn as nn
 
 config = {
 
-    "method": "model_01",
+    "method": "model_02",
 
     "learning_rate": 0.001,
 
     "weight_decay": 0.,
 
-    "batch_size": 2,
+    "batch_size": 16,
 
     "layers": 3,
 
@@ -30,7 +30,7 @@ config = {
 
     "separate": True,
     
-    "max_corpus_len": 16,
+    "max_corpus_len": 2,
 
     "max_epochs": 30
 
@@ -111,7 +111,7 @@ def main():
     model = MyModel(method=config["method"],
                     layers=config["layers"],
                     separate=config["separate"],
-                    dropout=config["dropout"])
+                    dropout=config["dropout"]).to(device)
 
     max_epochs = config["max_epochs"]
     eval_losses, eval_accus, eval_f1s = \
