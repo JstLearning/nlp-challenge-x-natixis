@@ -1,6 +1,8 @@
 import re
 from collections import Counter
 from langdetect import detect
+from gensim.summarization import summarize
+import pandas as pd
 
 def numbered_reference_removal(text):
     # refs are typically in the form [n] in the text.
@@ -54,7 +56,7 @@ def remove_title(x):
         res = re.sub(x["title"], '', x["text"]).strip()
         return res
     else:
-        return x["title"]
+        return None
 
 def website_remover(text):
     # Remove websites
@@ -72,16 +74,51 @@ def tag_removal(text):
     res = re.sub("Summary", "", res)
     return res
 
-def ecb_pipeline_en(x):
+
+def summarizeLine(text, tolist=False):
+    try:
+        res = summarize(text, word_count=500)
+        if tolist:
+            res = res.split("\n")
+    except:
+        return text
+    return res
+
+
+def pipeline_en(x, tolist=False):
     res = remove_title(x)
     if res is None:
-        return res
+        return x["title"]
     res = numbered_reference_removal(res)
     res = reference_removal_en(res)
     res = tag_removal(res).strip()
     res = first_date_extractor(res).strip()
+    res = summarizeLine(res, tolist)
 
     return res
 
 def fast_detect(x, bound=500):
     return detect(x[:min(len(x), bound)])
+
+
+def main():
+    FILENAME_ECB = "../data/ecb_data.csv"
+    FILENAME_FED = "../data/fed_data.csv"
+
+    ecb = pd.read_csv(FILENAME_ECB, index_col=0)
+    fed = pd.read_csv(FILENAME_FED, index_col=0)
+
+    ecb["text_"] = ecb.apply(pipeline_en, axis=1)
+    ecb["lang"] = ecb["text_"].apply(fast_detect)
+    fed["lang"] = fed["text"].apply(fast_detect)
+
+    with open("../data/ecb_data_preprocessed.csv", "w+", encoding="utf-8") as f:
+        ecb.to_csv(f)
+
+    with open("../data/fed_data_preprocessed.csv", "w+", encoding="utf-8") as f:
+        fed.to_csv(f)
+
+    print("Finished preprocessing.")
+
+if __name__=="__main__":
+    main()
