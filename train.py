@@ -168,11 +168,11 @@ def train_with_accumulation(model, train_loader, val_loader, config,
     eval_f1s = []
 
     patience = 0
-    my_patience = 2
+    my_patience = 3
 
     method = config["method"]
 
-    for epoch in range(max_epochs):
+    for epoch in range(1, max_epochs+1):
         total_loss = 0
         total_entries = 0
         correct = 0
@@ -240,6 +240,7 @@ def train_with_accumulation(model, train_loader, val_loader, config,
             else:
                 patience += 1
                 if patience >= my_patience:
+                    print(f"Ran out of patience because model did not improve in {patience} epochs.")
                     return eval_losses, eval_accus, eval_f1s
                 
 

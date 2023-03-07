@@ -54,13 +54,13 @@ class Optimizer(object):
 
                 "weight_decay": 10**trial.suggest_float("weight_decay_exp", -5, 5),
 
-                "batch_size": 2**trial.suggest_int("batch_size_exp", 1, 7),
+                "batch_size": 2**trial.suggest_int("batch_size_exp", 1, 4),
 
                 "layers": trial.suggest_int("layers", 1, 8),
 
                 "separate": trial.suggest_categorical("separate", [True, False]),
 
-                "dropout": trial.suggest_float("dropout", 0, 0.7),
+                "dropout": trial.suggest_float("dropout", 0.2, 0.7),
 
             }
 
