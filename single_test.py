@@ -16,7 +16,7 @@ import torch.nn as nn
 
 config = {
 
-    "method": "model_02",
+    "method": "model_03",
 
     "learning_rate": 0.001,
 
@@ -116,10 +116,10 @@ def main():
     max_epochs = config["max_epochs"]
     eval_losses, eval_accus, eval_f1s = \
         train(model, train_loader=train_loader, val_loader=val_loader,
-            config=config, device=device, max_epochs=25, eval_every=5,
-            name = "model_01_dummy")
+            config=config, device=device, max_epochs=max_epochs, eval_every=2,
+            name = f"{config['method']}_dummy")
     
-    with open(f"model_01_{max_epochs}_epochs.json", "w") as f:
+    with open(f"{config['method']}_{max_epochs}_epochs.json", "w") as f:
         json.dump({
             "config": config,
             "eval_losses": eval_losses,
