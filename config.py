@@ -62,6 +62,8 @@ class Optimizer(object):
 
                 "dropout": trial.suggest_float("dropout", 0.2, 0.7),
 
+                "max_corpus_len": 2
+
             }
 
 
@@ -86,12 +88,12 @@ class Optimizer(object):
             self.attempts += 1
             eval_losses, eval_accus, eval_f1s = \
                 train(model, train_loader=train_loader, val_loader=val_loader,
-                  config=config, device=device, max_epochs=25, eval_every=1,
+                  config=configs, device=device, max_epochs=25, eval_every=1,
                   name = str(self.attempts))
             
             with open(f"attempt_{self.attempts}.json", "w") as f:
                 json.dump({
-                    "config": config,
+                    "config": configs,
                     "eval_losses": eval_losses,
                     "eval_accus": eval_accus,
                     "eval_f1s": eval_f1s
