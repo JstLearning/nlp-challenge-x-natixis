@@ -196,20 +196,26 @@ def train_with_accumulation(model, train_loader, val_loader, config,
             for idx, batch in enumerate(tepoch):
                 # tqdm desc
                 tepoch.set_description(f"Epoch {epoch}")
-                X_ind = batch["X_ind"].to(device)
-                y = batch["label"].to(device)
 
-                if config["separate"]:
-                    X_ecb = batch["X_ecb"].to(device)
-                    X_ecb_att = batch["X_ecb_mask"].to(device)
-                    X_fed = batch["X_fed"].to(device)
-                    X_fed_att = batch["X_fed_mask"].to(device)
 
-                    X_text = (X_ecb, X_fed)
-                    X_mask = (X_ecb_att, X_fed_att)
+                if method is None:
+                    X_ind = batch["X_ind"].to(device)
+                    y = batch["label"].to(device)
+
+                    if config["separate"]:
+                        X_ecb = batch["X_ecb"].to(device)
+                        X_ecb_att = batch["X_ecb_mask"].to(device)
+                        X_fed = batch["X_fed"].to(device)
+                        X_fed_att = batch["X_fed_mask"].to(device)
+
+                        X_text = (X_ecb, X_fed)
+                        X_mask = (X_ecb_att, X_fed_att)
+                    else:
+                        X_text = (batch["X_text"].to(device),)
+                        X_mask = (batch["X_mask"].to(device),)
                 else:
-                    X_text = (batch["X_text"].to(device),)
-                    X_mask = (batch["X_mask"].to(device),)
+                    X_ind, y = batch
+                    X_text, X_mask = None, None
 
                 output = model(X_text, X_mask, X_ind)
                 # print(output)

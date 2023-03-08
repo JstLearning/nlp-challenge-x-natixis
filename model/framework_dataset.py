@@ -145,39 +145,10 @@ def get_data_loader(returns, ecb, fed, y,
             filler=""
         )
     elif method is None:
-        return get_data_loader_blank(
-            returns, ecb, fed, y,
-            separate=separate,
-            batch_size=batch_size,
-            max_corpus_len=max_corpus_len,
-            filler=""
-        )
+        return get_data_loader_blank(returns)
 
 
-def get_data_loader_blank(returns, ecb, fed, y,
-                               separate=True,
-                               batch_size=2,
-                               max_corpus_len=2, filler=""):
-    """Creates a DataLoader with no text.
-
-    Args:
-        returns (pd.DataFrame): A DataFrame for the returns dataset.
-        ecb (pd.DataFrame): A DataFrame for the ECB texts.
-        fed (pd.DataFrame): A DataFrame for the FED texts.
-        y (pd.DataFrame): A pd.Series for the targets.
-        method (str, optional): The method intended for the DataLoader. Defaults to "model_01".
-        separate (bool, optional): Whether to separate ECB texts from FED. Defaults to True.
-        batch_size (int, optional): The batch size for the loader.. Defaults to 2.
-        max_corpus_len (int, optional): The maximum corpus size. If separate=True, then
-            the corpus for both ECB and FED is made of max_corpus_len each, leading to
-            a total corpus size of 2*max_corpus_len. Defaults to 2.
-
-    Returns:
-        dataset (Dataset): A Dataset object for the specific method.
-        loader (DataLoader): A DataLoader for the specific method.
-        tokenizer: A tokenizer object that depends on the method.
-        steps (int): The amount of time steps in the sequential data (text here).
-    """
+def get_data_loader_blank(returns):
     dataset = BlankReturnsDataset(returns)
         
     loader = DataLoader(

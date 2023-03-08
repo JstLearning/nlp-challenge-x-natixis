@@ -79,7 +79,7 @@ class ClassificationHead(nn.Module):
     This is just a MLP.
     """
     
-    def __init__(self, corpus_emb_dim, nontext_dim=nontext_dim, layers=3, mlp_hidden_dim=128, dropout=0):
+    def __init__(self, corpus_emb_dim, nontext_dim, layers=3, mlp_hidden_dim=128, dropout=0):
         super(ClassificationHead, self).__init__()
         self.layers = layers
         self.corpus_emb_dim = corpus_emb_dim
@@ -89,11 +89,11 @@ class ClassificationHead(nn.Module):
         self.apply(self.weights_init_uniform_rule)
 
     def forward(self, x_corpus, x_nontext):
-        if x_corpus is None and x_nontext is None:
+        if (x_corpus is None or self.corpus_emb_dim == 0) and (x_nontext is None or self.nontext_dim == 0):
             raise ValueError("Both entries are None.")
-        if x_corpus is None:
+        if x_corpus is None or self.corpus_emb_dim == 0:
             x = x_nontext
-        elif x_nontext is None:
+        elif x_nontext is None or self.nontext_dim == 0:
             x = x_corpus
         else:
             x = torch.cat([x_corpus, x_nontext], dim=1).float()

@@ -16,19 +16,19 @@ import torch.nn as nn
 
 config = {
 
-    "method": 'model_03',
+    "method": None,
 
     "learning_rate": 1e-3,
 
-    "weight_decay": 0,
+    "weight_decay": 1e-3,
 
-    "batch_size": 16,
+    "batch_size": 128,
 
-    "layers": 3,
+    "layers": 4,
 
     "mlp_hidden_dim": 64,
 
-    "dropout": 0.5,
+    "dropout": 0.6,
 
     "separate": True,
     

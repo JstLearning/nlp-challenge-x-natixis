@@ -85,6 +85,7 @@ class MLP(nn.Module):
                                         )
             nb_blocks = (nb_layers-3)//2
             leftover = (nb_layers-3)%2
+            k = 0
             for k in range(nb_blocks):
                 layers_dict[f'step_{k+1}_residual'] = ResidualBlock(
                     hidden_dim=hidden_dim, dropout=dropout
