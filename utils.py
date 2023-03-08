@@ -22,14 +22,14 @@ def save_results(outputs_proba, outputs, targets, logloss, name, epoch):
     PATH_MODEL.mkdir(exist_ok=True)
     PATH_MODEL_EPOCH = PATH_MODEL / f"epoch_{epoch}"
     PATH_MODEL_EPOCH.mkdir(exist_ok=True)
-    with open(f'model_{name}_results.json', 'w') as f:
+    with open(PATH_MODEL_EPOCH / f'model_{name}_results.json', 'w') as f:
         json.dump({
             "name": str(name),
-            "outputs_proba": str(outputs_proba),
-            "outputs": str(outputs),
-            "targets": str(targets),
-            "logloss": str(logloss),
-            "epoch": str(epoch)
+            "outputs_proba": list(outputs_proba),
+            "outputs": list(outputs),
+            "targets": list(targets),
+            "logloss": logloss,
+            "epoch": epoch
         }, f)
 
 
