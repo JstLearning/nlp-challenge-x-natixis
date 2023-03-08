@@ -15,10 +15,13 @@ x_nontext   --- [Non-textual pipeline] ----- \
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from .model_01.model import CorpusEncoder as CorpusEncoder01
 from .model_02.model import CorpusEncoder as CorpusEncoder02
 from .model_03.model import CorpusEncoder as CorpusEncoder03
+
+import numpy as np
 
 
 nontextual_cols = ['Index - 9',
@@ -68,55 +71,133 @@ index_times = [
 
 nontext_dim = len(nontextual_cols)
 
+class MLPLayer(nn.Module):
+    def __init__(self, input_dim, output_dim, dropout=.4):
+        super(MLPLayer, self).__init__()
+        self.relu = nn.ReLU()
+        self.bn = nn.BatchNorm1d(input_dim)
+        self.dropout= nn.Dropout(dropout)
+        self.linear = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        z = self.bn(x)
+        z = self.dropout(z)
+        out = self.relu(self.linear(z))
+        return out
+
+class ResidualBlock(nn.Module):
+    def __init__(self, hidden_dim, dropout=.4):
+        super(ResidualBlock, self).__init__()
+        self.layer1 = MLPLayer(hidden_dim, hidden_dim, dropout)
+        self.bn = nn.BatchNorm1d(hidden_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.relu = nn.ReLU()
+        self.skip = nn.Identity()
+
+    def forward(self, x):
+        z = self.bn(x)
+        z = self.dropout(z)
+        z = self.layer1(z)
+        out = self.relu(z + self.skip(x))
+        return out
+
+class DownsamplingBlock(nn.Module):
+    def __init__(self, input_dim, dropout=.4):
+        super(DownsamplingBlock, self).__init__()
+        assert input_dim % 2 == 0
+        output_dim = input_dim//2
+        self.bn = nn.BatchNorm1d(input_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.relu = nn.ReLU()
+        self.linear = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x):
+        out = self.relu(self.linear(self.dropout(self.bn(x))))
+        return out
+
+
 class ClassificationHead(nn.Module):
     """
     A classification head with an adjustable amount of corpus dimension and nontextual dimension.
     This is just a MLP.
     """
     
-    def __init__(self, corpus_emb_dim, nontext_dim=nontext_dim, layers=3, dropout=0):
+    def __init__(self, corpus_emb_dim, nontext_dim=nontext_dim, layers=3, mlp_hidden_dim=128, dropout=0):
         super(ClassificationHead, self).__init__()
+        # self.bn = nn.BatchNorm1d(nontext_dim + corpus_emb_dim)
         self.layers = layers
         self.corpus_emb_dim = corpus_emb_dim
         self.nontext_dim = nontext_dim
+        self.layers = layers
+        
+        assert layers > 0
+        if layers==1:
+            self.fc1 = nn.Linear(corpus_emb_dim + nontext_dim, 1)
+        elif layers==2:
+            self.fc1 = nn.Linear(corpus_emb_dim + nontext_dim, mlp_hidden_dim)
+            self.fc_last = nn.Linear(hidden_dim, 1)
+        else:
+            nb_residual_blocks = (layers-2)//2
+            hidden_dim = 2**(4+nb_residual_blocks)
+            self.fc1 = MLPLayer(corpus_emb_dim + nontext_dim, hidden_dim, dropout)
+            layers_list = []
 
-        layers_list = []
-        output_sizes = [1, 32, 128, 256, 512]
-        input_size = output_sizes[1]
-        for i in range(layers-1):
-            # 1, 32, 128, 256, 512, 512, 512, ...
-            output_size = output_sizes[min(i, len(output_sizes)-1)]
-            input_size = output_sizes[min(i+1, len(output_sizes)-1)]
-            layers_list.append(nn.Linear(input_size, output_size))
-        output_sizes = output_sizes[min(layers-1, len(output_sizes)-1)]
-        input_size = corpus_emb_dim + nontext_dim
-        layers_list.append(nn.Linear(input_size, output_sizes))
-        # In place reverse
-        layers_list.reverse()
-
-        self.linears = nn.ModuleList(layers_list)
-        self.dropout = nn.Dropout(dropout)
+            for _ in range(nb_residual_blocks):
+                layers_list.append(ResidualBlock(hidden_dim, dropout))
+                layers_list.append(DownsamplingBlock(hidden_dim, dropout))
+                hidden_dim = hidden_dim//2
+            self.fcp = nn.Linear(hidden_dim, hidden_dim)
+            self.fc_last = nn.Linear(hidden_dim, 1)
+            self.linears = nn.ModuleList(layers_list)
         
         # Activation functions
-        self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
+        self.skip = nn.Identity()
+        self.apply(self.weights_init_uniform_rule)
 
     def forward(self, x_corpus, x_nontext):
-        x = torch.cat([x_corpus, x_nontext], dim=1).float()
-        for i, l in enumerate(self.linears):
-            x = l(x)
-            if i < self.layers-1:
-                x = self.relu(x)
-                x = self.dropout(x)
-            else:
-                x = self.sigmoid(x)
-        return x.view(-1)
+        assert not x_corpus is None and x_nontext is None
+
+        if x_corpus is None:
+            x = x_nontext
+        elif x_nontext is None:
+            x = x_corpus
+        else:
+            x = torch.cat([x_corpus, x_nontext], dim=1).float()
+        if self.layers == 1:
+            x = self.fc1(x)
+            x = self.sigmoid(x)
+            return x.view(-1)
+        elif self.layers == 2:
+            x = F.relu(self.fc1(x))
+            x = fc_last(x)
+            x = self.sigmoid(x)
+            return x.view(-1)
+        else:
+            x = self.fc1(x)
+            for l in self.linears:
+                x = l(x)
+            x = F.relu(self.fcp(x))
+            x = self.fc_last(x)
+            # print(x)
+            out = self.sigmoid(x)
+            return out.view(-1)
+
+    def weights_init_uniform_rule(self, m):
+        classname = m.__class__.__name__
+        # for every Linear layer in a model..
+        if classname.find('Linear') != -1:
+            # get the number of the inputs
+            n = m.in_features
+            y = 1.0/np.sqrt(n)
+            m.weight.data.uniform_(-y, y)
+            m.bias.data.fill_(0)
     
 
 class NontextualNetwork(nn.Module):
     """
     A network to process nontextual data.
-    For this, we pick a CNN.
+    For this, we do nothing...
     """
     
     def __init__(self, input_dim, input_channels, output_dim=nontext_dim, layers_nontext=3, dropout=0):
@@ -125,30 +206,6 @@ class NontextualNetwork(nn.Module):
         self.input_dim = input_dim
         self.input_channels = input_channels
         self.output_dim = output_dim
-
-        layers_list = []
-        channels = [1, 4, 16, 64]
-
-        for i in range(layers_nontext-1):
-            out_channels = channels[min(i, len(channels)-1)]
-            in_channels = channels[min(i+1, len(channels)-1)]
-            layers_list.append(nn.Conv1d(in_channels=in_channels, out_channels=out_channels,
-                                         kernel_size=3, stride=1, padding="same"))            
-        
-        out_channels = channels[min(layers_nontext-1, len(channels)-1)]
-        layers_list.append(nn.Conv1d(input_channels, channels, kernel_size=3, stride=1, padding="same"))
-        layers_list.reverse()
-
-        self.conv_layers = nn.ModuleList(layers_list)
-        self.linear = nn.Linear(input_dim, output_dim)
-        self.dropout = nn.Dropout(dropout)
-
-        
-        # Activation functions
-        self.pool = nn.MaxPool1d(kernel_size=2)
-        
-        self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         """Forward method for the NontextualNetwork.
@@ -161,15 +218,7 @@ class NontextualNetwork(nn.Module):
         Returns:
             Tensor: Tensor of size [batch_size, output_dim]
         """
-        for i, l in enumerate(self.conv_layers):
-            x = l(x)
-            x = self.relu(x)
-            x = self.dropout(x)
-    
-        batch_size_ = x.size(0)
-        x = x.view(batch_size_, -1)
-        x = self.linear(x)
-        return x
+        return None
         
 
 
@@ -225,15 +274,19 @@ class CorpusEncoder(nn.Module):
                 self.encoder_ecb = CorpusEncoder03(dropout=dropout)
                 self.encoder_fed = CorpusEncoder03(dropout=dropout)
         elif self.method=='model_03':
-            self.corpus_emb_dim = 32 * (1 + int(separate))
             if not separate:
                 self.encoder = CorpusEncoder03(dropout=dropout)
                 self.encoder_ecb = None
                 self.encoder_fed = None
+                self.corpus_emb_dim = self.encoder.corpus_emb_dim
             else:
                 self.encoder = None
                 self.encoder_ecb = CorpusEncoder03(dropout=dropout)
                 self.encoder_fed = CorpusEncoder03(dropout=dropout)
+                self.corpus_emb_dim = 2*self.encoder_ecb.corpus_emb_dim
+        elif self.method is None:
+            self.corpus_emb_dim = 0
+                
 
     def forward(self, x, x_masks):
         """_summary_
@@ -263,6 +316,8 @@ class CorpusEncoder(nn.Module):
             pass
         elif self.method=='model_01':
             pass
+        elif self.method is None:
+            return None
         if self.separate:
             x_ecb = self.encoder_ecb(x[0], x_masks[0])
             x_fed = self.encoder_fed(x[1], x_masks[1])
@@ -278,7 +333,7 @@ class MyModel(nn.Module):
 
     One can process the nontextual features with a pipeline, for instance a CNN.
     """
-    def __init__(self, has_nontext_network=False, nontext_dim=nontext_dim, layers_nontext=3,
+    def __init__(self, has_nontext_network=False, nontext_dim=nontext_dim, layers_nontext=3, mlp_hidden_dim=128,
                  method='model_01', separate=True, layers=3, dropout=0.3):
         """_summary_
 
@@ -299,21 +354,24 @@ class MyModel(nn.Module):
         self.method = method
         self.dropout=dropout
 
-        if has_nontext_network:
-            self.nontextual_pipeline = NontextualNetwork(
-                len(index_times), len(index_names), nontext_dim, layers_nontext=layers_nontext, dropout=dropout
-            )
-            self.nontext_dim = nontext_dim
-        else:
-            self.nontextual_pipeline = None
-            self.nontext_dim = len(nontextual_cols)
+        # if has_nontext_network:
+        #     self.nontextual_pipeline = NontextualNetwork(
+        #         len(index_times), len(index_names), nontext_dim, layers_nontext=layers_nontext, dropout=dropout
+        #     )
+        #     self.nontext_dim = nontext_dim
+        # else:
+        #     self.nontextual_pipeline = None
+        #     self.nontext_dim = len(nontextual_cols)
+
+        self.nontext_network = NontextualNetwork(input_dim=nontext_dim, input_channels=0,  output_dim=0)
+        self.nontext_dim = self.nontext_network.output_dim
 
         self.corpus_encoder = CorpusEncoder(method=method, separate=separate, dropout=dropout)
 
         corpus_emb_dim = self.corpus_encoder.corpus_emb_dim
         
         self.classifier = ClassificationHead(corpus_emb_dim=corpus_emb_dim, nontext_dim=self.nontext_dim,
-                                             layers=layers, dropout=dropout)
+                                             layers=layers, mlp_hidden_dim=mlp_hidden_dim, dropout=dropout)
     
     def forward(self, x_text, x_masks, x_nontext):
         """Forward method for the general framework.
@@ -335,6 +393,7 @@ class MyModel(nn.Module):
         elif self.method=='hierbert':
             pass
         # Temp
+        x_nontext = self.nontext_network(x_nontext)
         x_text_ = x_text
         x_corpus = self.corpus_encoder(x_text_, x_masks)
 

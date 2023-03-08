@@ -1,18 +1,22 @@
 import torch
 import torch.nn as nn
 from torch.optim import Adam
+from torch.nn.utils import clip_grad_norm_
 import numpy as np
+
+from utils import save_model, save_results
 
 import gc
 
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, log_loss
 from tqdm import tqdm
 
 
-def evaluate(model, val_loader, config, device):
+def evaluate(model, val_loader, config, device, name="", epoch=0):
     criterion = nn.BCELoss()
     preds = []
     labels = []
+    output_proba = []
     with torch.no_grad():
         total_loss = 0
         total_entries = 0
@@ -39,7 +43,10 @@ def evaluate(model, val_loader, config, device):
                     X_mask = (batch["X_mask"].to(device),)
 
                 output = model(X_text, X_mask, X_ind)
+                print(output)
                 loss = criterion(output, y)
+
+                output_proba.append(output.numpy(force=True))
 
                 # Computing predictions
                 batch_size_ = y.size(0)
@@ -59,15 +66,22 @@ def evaluate(model, val_loader, config, device):
     eval_loss = total_loss/total_entries
     eval_accu = 100. * correct/total_entries
 
+    PATH_OUTPUTS = "outputs/"
+    np.savez(PATH_OUTPUTS + "outputs.npz", np.array(output_proba), np.array(labels), np.array(preds))
+
     # Compute F1-score as well.
+    output_proba = np.concatenate(output_proba)
     preds = np.concatenate(preds)
     labels = np.concatenate(labels)
+    eval_loss = log_loss(labels, output_proba)
     eval_f1 = f1_score(labels, preds)
+    save_results(output_proba, preds, labels, eval_loss, name, epoch)
     return eval_loss, eval_accu, eval_f1
 
 
 def train(model, train_loader, val_loader, config,
-          device, max_epochs=25, eval_every=1, name=""):
+          device, max_epochs=25, eval_every=1, name="",
+          train_loss_history=[], starting_epoch=1):
     optimizer = Adam(model.parameters(),
                      lr=config["learning_rate"],
                      weight_decay=config["weight_decay"])
@@ -84,7 +98,7 @@ def train(model, train_loader, val_loader, config,
 
     method = config["method"]
 
-    for epoch in range(max_epochs):
+    for epoch in range(starting_epoch, max_epochs+1):
         total_loss = 0
         total_entries = 0
         correct = 0
@@ -111,9 +125,10 @@ def train(model, train_loader, val_loader, config,
                     X_mask = (batch["X_mask"].to(device),)
 
                 output = model(X_text, X_mask, X_ind)
-                # print(output)
+                print(output)
                 loss = criterion(output, y)
                 loss.backward()
+                # clip_grad_norm_(model.parameters(), max_norm=1., norm_type=2)
                 optimizer.step()
 
                 # Computing predictions
@@ -128,13 +143,13 @@ def train(model, train_loader, val_loader, config,
                 torch.cuda.empty_cache()
                 tepoch.set_postfix(loss=total_loss/total_entries,
                                    accuracy=100. * correct/total_entries)
-        del X_ecb, X_ecb_att, X_fed, X_fed_att, X_ind, y, batch
+        train_loss_history.append(total_loss/total_entries)
         gc.collect()
         torch.cuda.empty_cache()
         # Evaluation
         if epoch % eval_every == 0:
             eval_loss, eval_accu, eval_f1 = evaluate(
-                model, val_loader, config, device)
+                model, val_loader, config, device, name, epoch)
             eval_losses.append(eval_loss)
             eval_accus.append(eval_accu)
             eval_f1s.append(eval_f1)
@@ -142,8 +157,7 @@ def train(model, train_loader, val_loader, config,
             if eval_accu > best_accu:
                 best_accu = eval_accu
                 # Save model
-                torch.save(model.state_dict(),
-                           f"./model/weights/model_{name}_{epoch}_epochs.pt")
+                save_model(model, name, optimizer, epoch, train_loss_history)
                 patience = 0
             else:
                 patience += 1
@@ -220,7 +234,7 @@ def train_with_accumulation(model, train_loader, val_loader, config,
                 torch.cuda.empty_cache()
                 tepoch.set_postfix(loss=total_loss/total_entries,
                                     accuracy=100. * correct/total_entries)
-        del X_ecb, X_ecb_att, X_fed, X_fed_att, X_ind, y, batch
+        # del X_ecb, X_ecb_att, X_fed, X_fed_att, X_ind, y, batch
         gc.collect()
         torch.cuda.empty_cache()
         # Evaluation

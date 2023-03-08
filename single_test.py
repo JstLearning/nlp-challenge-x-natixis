@@ -8,7 +8,7 @@ from model.framework_model import MyModel
 from model.framework_dataset import get_data_loader
 from train import train, evaluate
 
-from preprocessing.preprocessing import ecb_pipeline_en, fast_detect
+# from preprocessing.preprocessing import ecb_pipeline_en, fast_detect
 from config import Optimizer
 
 import torch
@@ -16,15 +16,17 @@ import torch.nn as nn
 
 config = {
 
-    "method": "model_03",
+    "method": 'model_03',
 
-    "learning_rate": 0.001,
+    "learning_rate": 1e-3,
 
-    "weight_decay": 0.,
+    "weight_decay": 0,
 
     "batch_size": 16,
 
     "layers": 3,
+
+    "mlp_hidden_dim": 64,
 
     "dropout": 0.5,
 
@@ -32,7 +34,7 @@ config = {
     
     "max_corpus_len": 2,
 
-    "max_epochs": 30
+    "max_epochs": 20
 
 }
 
@@ -40,8 +42,8 @@ def main():
     # Load data
 
     FILENAME = "data/train_series.csv"
-    FILENAME_ECB = "data/ecb_data.csv"
-    FILENAME_FED = "data/fed_data.csv"
+    FILENAME_ECB = "data/ecb_data_preprocessed.csv"
+    FILENAME_FED = "data/fed_data_preprocessed.csv"
 
     returns = pd.read_csv(FILENAME, index_col=0)
     ecb = pd.read_csv(FILENAME_ECB, index_col=0)
@@ -90,9 +92,9 @@ def main():
         )
 
     ## Preprocess text
-    ecb["text_"] = ecb.apply(ecb_pipeline_en, axis=1)
-    ecb["lang"] = ecb["text_"].apply(fast_detect)
-    fed["lang"] = fed["text"].apply(fast_detect)
+    # ecb["text_"] = ecb.apply(ecb_pipeline_en, axis=1)
+    # ecb["lang"] = ecb["text_"].apply(fast_detect)
+    # fed["lang"] = fed["text"].apply(fast_detect)
 
     train_set, train_loader, tokenizer, steps = get_data_loader(
     returns_train, ecb, fed, y_train, method=config["method"],
@@ -110,6 +112,7 @@ def main():
 
     model = MyModel(method=config["method"],
                     layers=config["layers"],
+                    mlp_hidden_dim=config["mlp_hidden_dim"],
                     separate=config["separate"],
                     dropout=config["dropout"]).to(device)
 
@@ -117,7 +120,7 @@ def main():
     eval_losses, eval_accus, eval_f1s = \
         train(model, train_loader=train_loader, val_loader=val_loader,
             config=config, device=device, max_epochs=max_epochs, eval_every=2,
-            name = f"{config['method']}_dummy")
+            name = f"No_NLP")
     
     with open(f"{config['method']}_{max_epochs}_epochs.json", "w") as f:
         json.dump({

@@ -26,6 +26,23 @@ nontextual_cols = ['Index - 9',
                    'Index Name_VIX Index']
 
 
+class BlankReturnsDataset(Dataset):
+    def __init__(self, returns):
+        
+        self.returns = returns
+        self.y = y
+
+    def __getitem__(self, index):
+        # x_ind is of size (19)
+        x_ind = torch.Tensor(self.returns.iloc[index][nontextual_cols])
+
+        label = self.y.iloc[index]
+
+        return x_ind, torch.Tensor(label)
+
+    def __len__(self):
+        return self.returns.shape[0]
+
 class ReturnsDataset(Dataset):
     def __init__(self, returns, ecb, fed, y, max_corpus_len, 
                  english_only=False, separate=True, filler=""):
@@ -119,14 +136,58 @@ def get_data_loader(returns, ecb, fed, y,
             max_corpus_len=max_corpus_len,
             filler=""
         )
-    elif method == "model_03":
+    elif method == "model_03" or method is None:
         return get_data_loader_distilbert(
             returns, ecb, fed, y,
             separate=separate,
             batch_size=batch_size,
             max_corpus_len=max_corpus_len,
-            filler="Lorem Ipsum"
+            filler=""
         )
+    elif method is None:
+        return get_data_loader_blank(
+            returns, ecb, fed, y,
+            separate=separate,
+            batch_size=batch_size,
+            max_corpus_len=max_corpus_len,
+            filler=""
+        )
+
+
+def get_data_loader_blank(returns, ecb, fed, y,
+                               separate=True,
+                               batch_size=2,
+                               max_corpus_len=2, filler=""):
+    """Creates a DataLoader with no text.
+
+    Args:
+        returns (pd.DataFrame): A DataFrame for the returns dataset.
+        ecb (pd.DataFrame): A DataFrame for the ECB texts.
+        fed (pd.DataFrame): A DataFrame for the FED texts.
+        y (pd.DataFrame): A pd.Series for the targets.
+        method (str, optional): The method intended for the DataLoader. Defaults to "model_01".
+        separate (bool, optional): Whether to separate ECB texts from FED. Defaults to True.
+        batch_size (int, optional): The batch size for the loader.. Defaults to 2.
+        max_corpus_len (int, optional): The maximum corpus size. If separate=True, then
+            the corpus for both ECB and FED is made of max_corpus_len each, leading to
+            a total corpus size of 2*max_corpus_len. Defaults to 2.
+
+    Returns:
+        dataset (Dataset): A Dataset object for the specific method.
+        loader (DataLoader): A DataLoader for the specific method.
+        tokenizer: A tokenizer object that depends on the method.
+        steps (int): The amount of time steps in the sequential data (text here).
+    """
+    dataset = BlankReturnsDataset(returns)
+        
+    loader = DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=6
+    )
+    steps = 0
+    return dataset, loader, None, 0
 
 
 def get_data_loader_distilbert(returns, ecb, fed, y,
@@ -231,8 +292,8 @@ def get_data_loader_distilbert(returns, ecb, fed, y,
         dataset=dataset,
         collate_fn=lambda batch : collate_fn(batch, separate, max_corpus_len),
         batch_size=batch_size,
-        shuffle=True
-        # num_workers=3
+        shuffle=True,
+        num_workers=6
     )
     steps = 512
     return dataset, loader, tokenizer, steps
