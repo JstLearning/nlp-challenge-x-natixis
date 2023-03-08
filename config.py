@@ -48,32 +48,38 @@ class Optimizer(object):
         def objective(trial):
             configs = {
 
-                "method": trial.suggest_categorical("method", ["model_01", "model_02", "model_03"]),
+                "method": None,
 
                 "learning_rate": 10**trial.suggest_float("lr_exp", -4, -2),
 
                 "weight_decay": 10**trial.suggest_float("weight_decay_exp", -5, 5),
 
-                "batch_size": 2**trial.suggest_int("batch_size_exp", 1, 4),
+                "batch_size": 2**trial.suggest_int("batch_size_exp", 4, 5),
 
-                "layers": trial.suggest_int("layers", 1, 8),
+                "layers": trial.suggest_int("layers", 1, 10),
+
+                "mlp_hidden_dim": 64,
 
                 "separate": trial.suggest_categorical("separate", [True, False]),
 
                 "dropout": trial.suggest_float("dropout", 0.2, 0.7),
 
-                "max_corpus_len": 2
+                "max_corpus_len": 2,
+
+                "max_epochs": 10,
+
+                "eval_every": 3
 
             }
 
 
-            train_set, train_loader, tokenizer, steps = get_data_loader(
+            train_set, train_loader, _, steps = get_data_loader(
             returns_train, ecb, fed, y_train, method=configs["method"],
             separate=configs["separate"], max_corpus_len=configs["max_corpus_len"],
             batch_size=configs["batch_size"]
             )
 
-            val_set, val_loader, tokenizer, steps = get_data_loader(
+            val_set, val_loader, _, steps = get_data_loader(
                 returns_val, ecb, fed, y_val, method=configs["method"],
                 separate=configs["separate"], max_corpus_len=configs["max_corpus_len"],
                 batch_size=configs["batch_size"]
@@ -88,24 +94,31 @@ class Optimizer(object):
             self.attempts += 1
             eval_losses, eval_accus, eval_f1s = \
                 train(model, train_loader=train_loader, val_loader=val_loader,
-                  config=configs, device=device, max_epochs=25, eval_every=1,
+                  config=configs, device=device, max_epochs=configs["max_epochs"], eval_every=configs["eval_every"],
                   name = str(self.attempts))
             
-            with open(f"attempt_{self.attempts}.json", "w") as f:
-                json.dump({
-                    "config": configs,
-                    "eval_losses": eval_losses,
-                    "eval_accus": eval_accus,
-                    "eval_f1s": eval_f1s
-                }, f)
+            with open(f"performances.json", "r") as f:
+                perf_dict = json.load(f)
             
-            return eval_accus[-1]
+            perf_dict[self.attempts] = {
+                        "name": str(self.attempts),
+                        "config": configs,
+                        "eval_losses": eval_losses,
+                        "eval_accus": eval_accus,
+                        "eval_f1s": eval_f1s
+
+                        }
+            
+            with open(f"performances.json", "w") as f:
+                json.dump(perf_dict, f)
+            
+            return eval_losses[-1]
         
         self.objective = objective
-        self.study = optuna.create_study(direction="maximize")
+        self.study = optuna.create_study(direction="minimize")
 
     def optimize(self):
-        self.study.optimize(self.objective, n_trials=self.n_trials, n_jobs=1)
+        self.study.optimize(self.objective, n_trials=self.n_trials, n_jobs=5)
 
     def get_best_params(self):
         return self.study.best_params, self.study.best_value

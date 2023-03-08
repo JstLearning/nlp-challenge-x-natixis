@@ -18,13 +18,13 @@ config = {
 
     "method": None,
 
-    "learning_rate": 1e-3,
+    "learning_rate": 2e-3,
 
-    "weight_decay": 1e-3,
+    "weight_decay": 5e-3,
 
     "batch_size": 128,
 
-    "layers": 4,
+    "layers": ,
 
     "mlp_hidden_dim": 64,
 
@@ -119,7 +119,7 @@ def main():
     max_epochs = config["max_epochs"]
     eval_losses, eval_accus, eval_f1s = \
         train(model, train_loader=train_loader, val_loader=val_loader,
-            config=config, device=device, max_epochs=max_epochs, eval_every=2,
+            config=config, device=device, max_epochs=max_epochs, eval_every=3,
             name = f"No_NLP")
     
     with open(f"{config['method']}_{max_epochs}_epochs.json", "w") as f:

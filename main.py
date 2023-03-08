@@ -3,15 +3,15 @@ import numpy as np
 
 from sklearn.model_selection import train_test_split
 
-from preprocessing.preprocessing import ecb_pipeline_en, fast_detect
+# from preprocessing.preprocessing import ecb_pipeline_en, fast_detect
 from config import Optimizer
 
 def main():
     # Load data
 
     FILENAME = "data/train_series.csv"
-    FILENAME_ECB = "data/ecb_data.csv"
-    FILENAME_FED = "data/fed_data.csv"
+    FILENAME_ECB = "data/ecb_data_preprocessed.csv"
+    FILENAME_FED = "data/fed_data_preprocessed.csv"
 
     returns = pd.read_csv(FILENAME, index_col=0)
     ecb = pd.read_csv(FILENAME_ECB, index_col=0)
@@ -60,9 +60,9 @@ def main():
         )
 
     ## Preprocess text
-    ecb["text_"] = ecb.apply(ecb_pipeline_en, axis=1)
-    ecb["lang"] = ecb["text_"].apply(fast_detect)
-    fed["lang"] = fed["text"].apply(fast_detect)
+    # ecb["text_"] = ecb.apply(ecb_pipeline_en, axis=1)
+    # ecb["lang"] = ecb["text_"].apply(fast_detect)
+    # fed["lang"] = fed["text"].apply(fast_detect)
 
     optimizer = Optimizer(returns_train=returns_train,
                         returns_val=returns_val,
@@ -72,7 +72,7 @@ def main():
                         y_test=y_test,
                         ecb=ecb,
                         fed=fed,
-                        n_trials=10)
+                        n_trials=20)
 
     optimizer.optimize()
     return optimizer

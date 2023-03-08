@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 from transformers import DistilBertTokenizer
+import numpy as np
 
 nontextual_cols = ['Index - 9',
                    'Index - 8',
@@ -27,18 +28,18 @@ nontextual_cols = ['Index - 9',
 
 
 class BlankReturnsDataset(Dataset):
-    def __init__(self, returns):
+    def __init__(self, returns, y):
         
         self.returns = returns
         self.y = y
 
     def __getitem__(self, index):
         # x_ind is of size (19)
-        x_ind = torch.Tensor(self.returns.iloc[index][nontextual_cols])
+        x_ind = self.returns.iloc[index][nontextual_cols].to_numpy(dtype=np.float64)
 
         label = self.y.iloc[index]
 
-        return x_ind, torch.Tensor(label)
+        return x_ind, label.item()
 
     def __len__(self):
         return self.returns.shape[0]
@@ -136,7 +137,7 @@ def get_data_loader(returns, ecb, fed, y,
             max_corpus_len=max_corpus_len,
             filler=""
         )
-    elif method == "model_03" or method is None:
+    elif method == "model_03":
         return get_data_loader_distilbert(
             returns, ecb, fed, y,
             separate=separate,
@@ -145,17 +146,17 @@ def get_data_loader(returns, ecb, fed, y,
             filler=""
         )
     elif method is None:
-        return get_data_loader_blank(returns)
+        return get_data_loader_blank(returns, y, batch_size)
 
 
-def get_data_loader_blank(returns):
-    dataset = BlankReturnsDataset(returns)
+def get_data_loader_blank(returns, y, batch_size):
+    dataset = BlankReturnsDataset(returns, y)
         
     loader = DataLoader(
         dataset=dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=6
+        num_workers=3
     )
     steps = 0
     return dataset, loader, None, 0
