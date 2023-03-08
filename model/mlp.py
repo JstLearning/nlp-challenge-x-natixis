@@ -45,65 +45,65 @@ class DownsamplingBlock(nn.Module):
         return out
 
 class MLP(nn.Module):
-  def __init__(self, dim_1, dim_2, nb_layers, dropout=0.):
-    super(MLP, self).__init__()
+    def __init__(self, dim_1, dim_2, nb_layers, dropout=0.):
+        super(MLP, self).__init__()
 
-    if nb_layers==1:
-        self.layers = MLPLayer(input_dim=dim_1+dim_2,
-                               output_dim=1,
-                               dropout=dropout)
-    elif nb_layers==2:
-        self.hidden_dim = 64
-        self.layers = nn.Sequential(
-            MLPLayer(input_dim=dim_1+dim_2,
-                     output_dim=self.hidden_dim,
-                     dropout=dropout),
-            MLPLayer(input_dim=self.hidden_dim,
-                     output_dim=1,
-                     dropout=dropout)
-        )
-    elif nb_layers==3:
-        self.hidden_dim = 64
-        self.layers = nn.Sequential(
-            MLPLayer(input_dim=dim_1+dim_2,
-                     output_dim=self.hidden_dim,
-                     dropout=dropout),
-            nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.ReLU(),
-            nn.Linear(self.hidden_dim, 1),
-        )
-    else:
-        hidden_dim = 2 ** (4 + nb_layers)
-        layers_dict = OrderedDict()
-        layers_dict['MLP_input'] = MLPLayer(input_dim=dim_1+dim_2,
-                                         output_dim=hidden_dim
-                                    )
-        nb_blocks = (nb_layers-3)//2
-        leftover = (nb_layers-3)%2
-        for k in range(nb_blocks):
-            layers_dict[f'step_{k+1}'] = ResidualBlock(
-                hidden_dim=hidden_dim, dropout=dropout
+        if nb_layers==1:
+            self.layers = MLPLayer(input_dim=dim_1+dim_2,
+                                    output_dim=1,
+                                    dropout=dropout)
+        elif nb_layers==2:
+            self.hidden_dim = 64
+            self.layers = nn.Sequential(
+                MLPLayer(input_dim=dim_1+dim_2,
+                            output_dim=self.hidden_dim,
+                            dropout=dropout),
+                MLPLayer(input_dim=self.hidden_dim,
+                            output_dim=1,
+                            dropout=dropout)
             )
-            layers_dict[f'step_{k+2}'] = DownsamplingBlock(
-                input_dim=hidden_dim, dropout=dropout
+        elif nb_layers==3:
+            self.hidden_dim = 64
+            self.layers = nn.Sequential(
+                MLPLayer(input_dim=dim_1+dim_2,
+                            output_dim=self.hidden_dim,
+                            dropout=dropout),
+                nn.Linear(self.hidden_dim, self.hidden_dim),
+                nn.ReLU(),
+                nn.Linear(self.hidden_dim, 1),
             )
-            hidden_dim = hidden_dim//2
-        if leftover==1:
-            layers_dict[f'step_{k+3}'] = ResidualBlock(
-                hidden_dim=hidden_dim, dropout=dropout
+        else:
+            hidden_dim = 2 ** (4 + nb_layers)
+            layers_dict = OrderedDict()
+            layers_dict['MLP_input'] = MLPLayer(input_dim=dim_1+dim_2,
+                                                output_dim=hidden_dim
+                                        )
+            nb_blocks = (nb_layers-3)//2
+            leftover = (nb_layers-3)%2
+            for k in range(nb_blocks):
+                layers_dict[f'step_{k+1}'] = ResidualBlock(
+                    hidden_dim=hidden_dim, dropout=dropout
+                )
+                layers_dict[f'step_{k+2}'] = DownsamplingBlock(
+                    input_dim=hidden_dim, dropout=dropout
+                )
+                hidden_dim = hidden_dim//2
+            if leftover==1:
+                layers_dict[f'step_{k+3}'] = ResidualBlock(
+                    hidden_dim=hidden_dim, dropout=dropout
+                )
+            layers_dict['Second_last_linear'] = nn.Linear(
+                hidden_dim, hidden_dim
             )
-        layers_dict['Second_last_linear'] = nn.Linear(
-            hidden_dim, hidden_dim
-        )
-        layers_dict['Last_ReLU'] = nn.ReLU()
-        layers_dict['Last_Linear'] = nn.Linear(
-            hidden_dim, 1
-        )
+            layers_dict['Last_ReLU'] = nn.ReLU()
+            layers_dict['Last_Linear'] = nn.Linear(
+                hidden_dim, 1
+            )
 
-        self.layers = nn.Sequential(layers_dict)
+            self.layers = nn.Sequential(layers_dict)
 
-    self.sigmoid = nn.Sigmoid()
-  
+        self.sigmoid = nn.Sigmoid()
+
     def forward(self, x1, x2):
         if x1 is None and x2 is None:
             raise ValueError("Both x1 and x2 are None.")
