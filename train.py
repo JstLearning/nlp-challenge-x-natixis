@@ -43,7 +43,7 @@ def evaluate(model, val_loader, config, device, name="", epoch=0):
                     X_mask = (batch["X_mask"].to(device),)
 
                 output = model(X_text, X_mask, X_ind)
-                print(output)
+                # print(output)
                 loss = criterion(output, y)
 
                 output_proba.append(output.numpy(force=True))
@@ -125,7 +125,7 @@ def train(model, train_loader, val_loader, config,
                     X_mask = (batch["X_mask"].to(device),)
 
                 output = model(X_text, X_mask, X_ind)
-                print(output)
+                # print(output)
                 loss = criterion(output, y)
                 loss.backward()
                 # clip_grad_norm_(model.parameters(), max_norm=1., norm_type=2)

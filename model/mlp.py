@@ -11,7 +11,8 @@ class MLPLayer(nn.Module):
         self.linear = nn.Linear(input_dim, output_dim)
 
     def forward(self, x):
-        out = self.relu(self.linear(self.dropout(self.bn(x))))
+        z = self.bn(x)
+        out = self.relu(self.linear(self.dropout(z)))
         return out
 
 class ResidualBlock(nn.Module):
@@ -45,17 +46,21 @@ class DownsamplingBlock(nn.Module):
         return out
 
 class MLP(nn.Module):
-    def __init__(self, dim_1, dim_2, nb_layers, dropout=0.):
+    def __init__(self, input_dim, nb_layers, mlp_hidden_dim=64, dropout=0.):
         super(MLP, self).__init__()
+        assert nb_layers > 0
+        self.input_dim = input_dim
+        self.nb_layers = nb_layers
+
 
         if nb_layers==1:
-            self.layers = MLPLayer(input_dim=dim_1+dim_2,
+            self.layers = MLPLayer(input_dim=input_dim,
                                     output_dim=1,
                                     dropout=dropout)
         elif nb_layers==2:
-            self.hidden_dim = 64
+            self.hidden_dim = mlp_hidden_dim
             self.layers = nn.Sequential(
-                MLPLayer(input_dim=dim_1+dim_2,
+                MLPLayer(input_dim=input_dim,
                             output_dim=self.hidden_dim,
                             dropout=dropout),
                 MLPLayer(input_dim=self.hidden_dim,
@@ -63,9 +68,9 @@ class MLP(nn.Module):
                             dropout=dropout)
             )
         elif nb_layers==3:
-            self.hidden_dim = 64
+            self.hidden_dim = mlp_hidden_dim
             self.layers = nn.Sequential(
-                MLPLayer(input_dim=dim_1+dim_2,
+                MLPLayer(input_dim=input_dim,
                             output_dim=self.hidden_dim,
                             dropout=dropout),
                 nn.Linear(self.hidden_dim, self.hidden_dim),
@@ -75,16 +80,16 @@ class MLP(nn.Module):
         else:
             hidden_dim = 2 ** (4 + nb_layers)
             layers_dict = OrderedDict()
-            layers_dict['MLP_input'] = MLPLayer(input_dim=dim_1+dim_2,
+            layers_dict['MLP_input'] = MLPLayer(input_dim=input_dim,
                                                 output_dim=hidden_dim
                                         )
             nb_blocks = (nb_layers-3)//2
             leftover = (nb_layers-3)%2
             for k in range(nb_blocks):
-                layers_dict[f'step_{k+1}'] = ResidualBlock(
+                layers_dict[f'step_{k+1}_residual'] = ResidualBlock(
                     hidden_dim=hidden_dim, dropout=dropout
                 )
-                layers_dict[f'step_{k+2}'] = DownsamplingBlock(
+                layers_dict[f'step_{k+1}_downsampling'] = DownsamplingBlock(
                     input_dim=hidden_dim, dropout=dropout
                 )
                 hidden_dim = hidden_dim//2
@@ -104,15 +109,7 @@ class MLP(nn.Module):
 
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x1, x2):
-        if x1 is None and x2 is None:
-            raise ValueError("Both x1 and x2 are None.")
-        elif x1 is None:
-            x = x2
-        elif x2 is None:
-            x = x1
-        else:
-            x = torch.cat([x1, x2], dim=1)
+    def forward(self, x):
         x = self.layers(x)
         x = self.sigmoid(x)
         return x

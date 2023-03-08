@@ -17,6 +17,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .mlp import MLP
+
 from .model_01.model import CorpusEncoder as CorpusEncoder01
 from .model_02.model import CorpusEncoder as CorpusEncoder02
 from .model_03.model import CorpusEncoder as CorpusEncoder03
@@ -71,51 +73,6 @@ index_times = [
 
 nontext_dim = len(nontextual_cols)
 
-class MLPLayer(nn.Module):
-    def __init__(self, input_dim, output_dim, dropout=.4):
-        super(MLPLayer, self).__init__()
-        self.relu = nn.ReLU()
-        self.bn = nn.BatchNorm1d(input_dim)
-        self.dropout= nn.Dropout(dropout)
-        self.linear = nn.Linear(input_dim, output_dim)
-
-    def forward(self, x):
-        z = self.bn(x)
-        z = self.dropout(z)
-        out = self.relu(self.linear(z))
-        return out
-
-class ResidualBlock(nn.Module):
-    def __init__(self, hidden_dim, dropout=.4):
-        super(ResidualBlock, self).__init__()
-        self.layer1 = MLPLayer(hidden_dim, hidden_dim, dropout)
-        self.bn = nn.BatchNorm1d(hidden_dim)
-        self.dropout = nn.Dropout(dropout)
-        self.relu = nn.ReLU()
-        self.skip = nn.Identity()
-
-    def forward(self, x):
-        z = self.bn(x)
-        z = self.dropout(z)
-        z = self.layer1(z)
-        out = self.relu(z + self.skip(x))
-        return out
-
-class DownsamplingBlock(nn.Module):
-    def __init__(self, input_dim, dropout=.4):
-        super(DownsamplingBlock, self).__init__()
-        assert input_dim % 2 == 0
-        output_dim = input_dim//2
-        self.bn = nn.BatchNorm1d(input_dim)
-        self.dropout = nn.Dropout(dropout)
-        self.relu = nn.ReLU()
-        self.linear = nn.Linear(input_dim, output_dim)
-
-    def forward(self, x):
-        out = self.relu(self.linear(self.dropout(self.bn(x))))
-        return out
-
-
 class ClassificationHead(nn.Module):
     """
     A classification head with an adjustable amount of corpus dimension and nontextual dimension.
@@ -124,64 +81,25 @@ class ClassificationHead(nn.Module):
     
     def __init__(self, corpus_emb_dim, nontext_dim=nontext_dim, layers=3, mlp_hidden_dim=128, dropout=0):
         super(ClassificationHead, self).__init__()
-        # self.bn = nn.BatchNorm1d(nontext_dim + corpus_emb_dim)
         self.layers = layers
         self.corpus_emb_dim = corpus_emb_dim
         self.nontext_dim = nontext_dim
-        self.layers = layers
         
-        assert layers > 0
-        if layers==1:
-            self.fc1 = nn.Linear(corpus_emb_dim + nontext_dim, 1)
-        elif layers==2:
-            self.fc1 = nn.Linear(corpus_emb_dim + nontext_dim, mlp_hidden_dim)
-            self.fc_last = nn.Linear(hidden_dim, 1)
-        else:
-            nb_residual_blocks = (layers-2)//2
-            hidden_dim = 2**(4+nb_residual_blocks)
-            self.fc1 = MLPLayer(corpus_emb_dim + nontext_dim, hidden_dim, dropout)
-            layers_list = []
-
-            for _ in range(nb_residual_blocks):
-                layers_list.append(ResidualBlock(hidden_dim, dropout))
-                layers_list.append(DownsamplingBlock(hidden_dim, dropout))
-                hidden_dim = hidden_dim//2
-            self.fcp = nn.Linear(hidden_dim, hidden_dim)
-            self.fc_last = nn.Linear(hidden_dim, 1)
-            self.linears = nn.ModuleList(layers_list)
-        
-        # Activation functions
-        self.sigmoid = nn.Sigmoid()
-        self.skip = nn.Identity()
+        self.mlp = MLP(corpus_emb_dim + nontext_dim, layers, mlp_hidden_dim, dropout)
         self.apply(self.weights_init_uniform_rule)
 
     def forward(self, x_corpus, x_nontext):
-        assert not x_corpus is None and x_nontext is None
-
+        if x_corpus is None and x_nontext is None:
+            raise ValueError("Both entries are None.")
         if x_corpus is None:
             x = x_nontext
         elif x_nontext is None:
             x = x_corpus
         else:
             x = torch.cat([x_corpus, x_nontext], dim=1).float()
-        if self.layers == 1:
-            x = self.fc1(x)
-            x = self.sigmoid(x)
-            return x.view(-1)
-        elif self.layers == 2:
-            x = F.relu(self.fc1(x))
-            x = fc_last(x)
-            x = self.sigmoid(x)
-            return x.view(-1)
-        else:
-            x = self.fc1(x)
-            for l in self.linears:
-                x = l(x)
-            x = F.relu(self.fcp(x))
-            x = self.fc_last(x)
-            # print(x)
-            out = self.sigmoid(x)
-            return out.view(-1)
+        
+        out = self.mlp(x)
+        return out.view(-1)
 
     def weights_init_uniform_rule(self, m):
         classname = m.__class__.__name__
@@ -218,7 +136,7 @@ class NontextualNetwork(nn.Module):
         Returns:
             Tensor: Tensor of size [batch_size, output_dim]
         """
-        return None
+        return x
         
 
 
@@ -363,7 +281,7 @@ class MyModel(nn.Module):
         #     self.nontextual_pipeline = None
         #     self.nontext_dim = len(nontextual_cols)
 
-        self.nontext_network = NontextualNetwork(input_dim=nontext_dim, input_channels=0,  output_dim=0)
+        self.nontext_network = NontextualNetwork(input_dim=nontext_dim, input_channels=nontext_dim,  output_dim=nontext_dim)
         self.nontext_dim = self.nontext_network.output_dim
 
         self.corpus_encoder = CorpusEncoder(method=method, separate=separate, dropout=dropout)
@@ -393,9 +311,13 @@ class MyModel(nn.Module):
         elif self.method=='hierbert':
             pass
         # Temp
+
         x_nontext = self.nontext_network(x_nontext)
-        x_text_ = x_text
-        x_corpus = self.corpus_encoder(x_text_, x_masks)
+
+        if self.method is None:
+            x_corpus = None
+        else:
+            x_corpus = self.corpus_encoder(x_text, x_masks)
 
         # Downstream classification
         out = self.classifier(x_corpus, x_nontext)
