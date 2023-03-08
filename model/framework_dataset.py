@@ -293,7 +293,7 @@ def get_data_loader_distilbert(returns, ecb, fed, y,
         collate_fn=lambda batch : collate_fn(batch, separate, max_corpus_len),
         batch_size=batch_size,
         shuffle=True,
-        num_workers=6
+        # num_workers=6
     )
     steps = 512
     return dataset, loader, tokenizer, steps
