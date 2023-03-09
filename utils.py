@@ -25,12 +25,9 @@ def save_results(outputs_proba, outputs, targets, logloss, name, epoch):
     with open(PATH_MODEL_EPOCH / f'model_{name}_results.json', 'w') as f:
         json.dump({
             "name": str(name),
-            "outputs_proba": list(outputs_proba),
-            "outputs": list(outputs),
-            "targets": list(targets),
-            "logloss": logloss,
+            "outputs_proba": outputs_proba.astype(str).tolist(),
+            "outputs": outputs.astype(str).tolist(),
+            "targets": targets.astype(str).tolist(),
+            "logloss": str(logloss),
             "epoch": epoch
         }, f)
-
-
-    

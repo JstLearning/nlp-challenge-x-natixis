@@ -129,7 +129,9 @@ def get_data_loader(returns, ecb, fed, y,
         tokenizer: A tokenizer object that depends on the method.
         steps (int): The amount of time steps in the sequential data (text here).
     """
-    if method in ["model_01", "model_02"]:
+    if method is None:
+        return get_data_loader_blank(returns, y, batch_size)
+    elif method in ["model_01", "model_02"]:
         return get_data_loader_distilbert(
             returns, ecb, fed, y,
             separate=separate,
@@ -145,8 +147,7 @@ def get_data_loader(returns, ecb, fed, y,
             max_corpus_len=max_corpus_len,
             filler=""
         )
-    elif method is None:
-        return get_data_loader_blank(returns, y, batch_size)
+        
 
 
 def get_data_loader_blank(returns, y, batch_size):
@@ -156,7 +157,7 @@ def get_data_loader_blank(returns, y, batch_size):
         dataset=dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=3
+        # num_workers=3
     )
     steps = 0
     return dataset, loader, None, 0

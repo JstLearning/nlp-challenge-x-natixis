@@ -13,7 +13,8 @@ from tqdm import tqdm
 
 
 def evaluate(model, val_loader, config, device, name="", epoch=0):
-    criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogitsLoss()
+    sigmoid = nn.Sigmoid()
     preds = []
     labels = []
     output_proba = []
@@ -55,6 +56,7 @@ def evaluate(model, val_loader, config, device, name="", epoch=0):
                 # print(output)
                 loss = criterion(output, y)
 
+                output = sigmoid(output)
                 output_proba.append(output.numpy(force=True))
 
                 # Computing predictions
@@ -94,7 +96,8 @@ def train(model, train_loader, val_loader, config,
     optimizer = Adam(model.parameters(),
                      lr=config["learning_rate"],
                      weight_decay=config["weight_decay"])
-    criterion = nn.BCELoss()
+    criterion = nn.BCEWithLogitsLoss()
+    sigmoid = nn.Sigmoid()
 
     best_accu = 0
 
@@ -142,12 +145,14 @@ def train(model, train_loader, val_loader, config,
                         X_mask = (batch["X_mask"].to(device),)
 
                 output = model(X_text, X_mask, X_ind)
-                # print(output)
+                # print(output.size())
                 loss = criterion(output, y)
+                # print(loss.grad_fn)
+                
                 loss.backward()
                 # clip_grad_norm_(model.parameters(), max_norm=1., norm_type=2)
                 optimizer.step()
-
+                output = sigmoid(output)
                 # Computing predictions
                 batch_size_ = y.size(0)
                 output = output.round()

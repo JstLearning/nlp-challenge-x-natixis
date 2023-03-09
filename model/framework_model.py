@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .mlp import MLP
+from .mlp import MLP, CompactMLP
 
 from .model_01.model import CorpusEncoder as CorpusEncoder01
 from .model_02.model import CorpusEncoder as CorpusEncoder02
@@ -85,10 +85,11 @@ class ClassificationHead(nn.Module):
         self.corpus_emb_dim = corpus_emb_dim
         self.nontext_dim = nontext_dim
         
-        self.mlp = MLP(corpus_emb_dim + nontext_dim, layers, mlp_hidden_dim, dropout)
+        self.mlp = CompactMLP(corpus_emb_dim + nontext_dim, layers, mlp_hidden_dim, dropout)
         self.apply(self.weights_init_uniform_rule)
 
     def forward(self, x_corpus, x_nontext):
+        # print("x_nontext is leaf : ", x_nontext.is_leaf)
         if (x_corpus is None or self.corpus_emb_dim == 0) and (x_nontext is None or self.nontext_dim == 0):
             raise ValueError("Both entries are None.")
         if x_corpus is None or self.corpus_emb_dim == 0:
@@ -97,7 +98,7 @@ class ClassificationHead(nn.Module):
             x = x_corpus
         else:
             x = torch.cat([x_corpus, x_nontext], dim=1).float()
-        
+        # print("x before mlp is leaf: ", x.is_leaf)
         out = self.mlp(x)
         return out.view(-1)
 

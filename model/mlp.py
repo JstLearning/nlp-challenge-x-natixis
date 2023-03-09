@@ -7,28 +7,46 @@ class MLPLayer(nn.Module):
         super(MLPLayer, self).__init__()
         self.relu = nn.ReLU()
         self.bn = nn.BatchNorm1d(input_dim)
+
+
         self.dropout= nn.Dropout(dropout)
         self.linear = nn.Linear(input_dim, output_dim)
 
     def forward(self, x):
+        # print("x in entry of MLP Layer is leaf: ", x.is_leaf, x.grad)
         z = self.bn(x)
-        out = self.relu(self.linear(self.dropout(z)))
+        # print("z is leaf : ", z.is_leaf, z.grad)
+        z = self.dropout(x)
+        # print("After dropout, z is leaf: ", z.is_leaf)
+        z = self.linear(z)
+        # print("After linear, z is leaf: ", z.is_leaf)
+        out = self.relu(z)
+        # print("MLP Layer out is leaf: ", out.is_leaf)
         return out
 
 class ResidualBlock(nn.Module):
     def __init__(self, hidden_dim, dropout=.4):
         super(ResidualBlock, self).__init__()
         self.layer1 = MLPLayer(hidden_dim, hidden_dim, dropout)
-        self.bn = nn.BatchNorm1d(hidden_dim)
+        self.bn = nn.BatchNorm1d(hidden_dim, track_running_stats=False)
+        self.bn.weight.requires_grad = True
+        self.bn.bias.requires_grad = True
+
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         self.skip = nn.Identity()
 
     def forward(self, x):
+        # print("Entry of residual block is leaf: ", x.is_leaf)
         z = self.bn(x)
+        x_ = self.skip(x)
+        # print("After batch norm, z is leaf: ", z.is_leaf)
         z = self.dropout(z)
+        # print("After dropout, z is leaf: ", z.is_leaf)
         z = self.layer1(z)
-        out = self.relu(z + self.skip(x))
+        # print("After linear layer, z is leaf: ", z.is_leaf)
+        out = self.relu(z + x_)
+        # print("Residual output is leaf: ", out.is_leaf)
         return out
 
 class DownsamplingBlock(nn.Module):
@@ -36,13 +54,16 @@ class DownsamplingBlock(nn.Module):
         super(DownsamplingBlock, self).__init__()
         assert input_dim % 2 == 0
         output_dim = input_dim//2
-        self.bn = nn.BatchNorm1d(input_dim)
+        self.bn = nn.BatchNorm1d(input_dim, track_running_stats=False)
+        self.bn.weight.requires_grad = True
+        self.bn.bias.requires_grad = True
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
         self.linear = nn.Linear(input_dim, output_dim)
 
     def forward(self, x):
         out = self.relu(self.linear(self.dropout(self.bn(x))))
+        # print("After downsampling, out is leaf: ", out.is_leaf)
         return out
 
 class MLP(nn.Module):
@@ -108,9 +129,60 @@ class MLP(nn.Module):
 
             self.layers = nn.Sequential(layers_dict)
 
+
+    def forward(self, x):
+        # print("Before layers, x is a leaf node: ", x.is_leaf)
+        x = self.layers(x)
+        # print("after layers, x is a leaf node: ", x.is_leaf)
+        # print("after Sigmoid, x is a leaf node: ", x.is_leaf)
+        return x
+
+
+
+class SimpleMLP(nn.Module):
+    def __init__(self, input_size, layers, hidden_size, dropout=0):
+        super(SimpleMLP, self).__init__()
+        layer_sizes = [input_size] + [hidden_size]*(layers-1) + [1]
+        layers = []
+        for i in range(len(layer_sizes)-1):
+            layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
+            if i < len(layer_sizes)-2:
+                layers.append(nn.ReLU())
+                layers.append(nn.Dropout(p=dropout))
+        self.layers = nn.Sequential(*layers)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.layers(x)
         x = self.sigmoid(x)
         return x
+
+
+class CompactMLP(nn.Module):
+    def __init__(self, input_size, nb_layers, hidden_size, dropout_prob=0.0):
+        super(CompactMLP, self).__init__()
+        output_size = 1
+        hidden_sizes = [hidden_size] * (nb_layers-1)
+        layer_sizes = [input_size] + hidden_sizes
+        layers = []
+        for i in range(len(layer_sizes)-1):
+            layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
+            layers.append(nn.BatchNorm1d(layer_sizes[i+1]))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(p=dropout_prob))
+            if i > 0:
+                layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
+        layers.append(nn.Linear(hidden_sizes[-1], output_size))
+        self.layers = nn.ModuleList(layers)
+
+    def forward(self, x):
+        skip_connections = []
+        for layer in self.layers:
+            x = layer(x)
+            if isinstance(layer, nn.Linear):
+                skip_connections.append(x)
+        out = skip_connections[-1]
+        for i in range(len(skip_connections)-2, -1, -1):
+            if skip_connections[i].shape[-1] == out.shape[-1]:
+                out = out + skip_connections[i]
+        return out
