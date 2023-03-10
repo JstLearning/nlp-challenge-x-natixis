@@ -109,7 +109,7 @@ class AttentionBiGRU(nn.Module):
         return x
 
 class DocumentEncoder(nn.Module):
-    def __init__(self, hidden_dim = 64, bias=True, dropout=.5):
+    def __init__(self):
         super(DocumentEncoder, self).__init__()
         self.text_encoder = DistilBertModel.from_pretrained("distilbert-base-uncased")
     def forward(self, x, attention_mask=None):
@@ -121,7 +121,6 @@ class DocumentEncoder(nn.Module):
         # To retrieve the embedding of the CLS token, we will just take the first step
         # of every document.
         x = x[:, 0, :]
-        # x = self.dropout(x)
         # x needs to have shape: (samples, features=768)
         # x is now of size (samples, features=768) and represents a document.
         return x
@@ -133,14 +132,16 @@ class Pooling(nn.Module):
             output_dim = input_dim
         if pooling=='attentive':
             self.att_bigru = AttentionBiGRU(
-                input_shape=input_dim, output_shape_2=self.output_dim//2,
-                bias=bias, dropout=dropout
+                input_shape=input_dim, output_shape_2=output_dim//2,
+                bias=True, dropout=dropout
                 )
         elif pooling=='max' or pooling=='mean' or pooling=='sum':
-            self.linear = nn.Linear(input_dim, output_dim, bias=False)
+            # self.linear = nn.Linear(input_dim, output_dim, bias=False)
+            pass
         else:
-            #pick first
-            self.linear = nn.Linear(input_dim, output_dim, bias=False)
+            # pick first
+            # self.linear = nn.Linear(input_dim, output_dim, bias=False)
+            pass
         self.pooling = pooling
 
     def forward(self, x, x_mask):
@@ -150,29 +151,28 @@ class Pooling(nn.Module):
         elif self.pooling == 'max':
             x_mask = (x_mask.sum(dim=-1, keepdim=True) > 2).float()
             x_mask = torch.log(x_mask + 1e-5)
-            return self.linear(torch.max(x + x_mask, dim=-2))
+            return torch.max(x + x_mask, dim=-2)[0]
         elif self.pooling == 'sum':
             x_mask = (x_mask.sum(dim=-1, keepdim=True) > 2).float()
             x = torch.sum(x * x_mask, dim=-2)
-            return self.linear(x)
+            return x
         elif self.pooling == 'mean':
             x_mask = (x_mask.sum(dim=-1, keepdim=True) > 2).float()
             x_counts = torch.sum(x_mask, dim=-1, keepdim=True)
             x = torch.sum(x * x_mask, dim=-2) / x_counts
-            return self.linear(x)
+            return x
         else:
             # Pick first
-            return self.linear(x[:, 0, :])
+            return x[:, 0, :]
     
 
 class CorpusEncoder(nn.Module):
     def __init__(self, bias=True, dropout=.5):
         super(CorpusEncoder, self).__init__()
-        self.doc_encoder = DocumentEncoder(bias=bias)
+        self.doc_encoder = DocumentEncoder()
         self.W = nn.Linear(in_features=768, out_features=32)
-        self.corpus_emb_dim = 16
-        self.dropout = nn.Dropout(dropout)
-        self.pooling = Pooling(input_dim = 768, output_dim = 16, pooling='sum', dropout=dropout)
+        self.corpus_emb_dim = 768
+        self.pooling = Pooling(input_dim = 768, output_dim = self.corpus_emb_dim, pooling='sum', dropout=dropout)
     
     def forward(self, x, attention_mask=None):
         # Get a document embedding first.
@@ -208,9 +208,6 @@ class CorpusEncoder(nn.Module):
         #  [False]],
         # ...,
         # ]
-        # print("Encode corpus")
-        # attention_mask = torch.sum(attention_mask, dim=-1, keepdim=True).ge(3)
-        
         x = self.pooling(x, attention_mask)
         # x is now of size (samples, features=32) and represents a corpus.
         return x

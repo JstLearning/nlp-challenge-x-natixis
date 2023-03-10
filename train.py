@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.nn.utils import clip_grad_norm_
+from torch.optim.lr_scheduler import StepLR
 import numpy as np
 
 from utils import save_model, save_results
@@ -10,6 +11,8 @@ import gc
 
 from sklearn.metrics import f1_score, log_loss
 from tqdm import tqdm
+
+import datetime
 
 
 def evaluate(model, val_loader, config, device, name="", epoch=0):
@@ -96,6 +99,21 @@ def train(model, train_loader, val_loader, config,
     optimizer = Adam(model.parameters(),
                      lr=config["learning_rate"],
                      weight_decay=config["weight_decay"])
+    if config["preload"]:
+        state = torch.load(config["preload"])
+        model.load_state_dict(state['model_state_dict'])
+        optimizer.load_state_dict(state['optimizer'])
+        starting_epoch = state['epoch']
+        train_loss_history = state['train_loss_history']
+
+    scheduler_step = config["scheduler_step"]
+    early_stopping = config["early_stopping"]
+    if scheduler_step > 0:
+        scheduler_ratio = config["scheduler_ratio"]
+        scheduler_last_epoch = config["scheduler_last_epoch"]
+        scheduler = StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_ratio)
+    else:
+        scheduler.load_state_dict(state['scheduler'])
     criterion = nn.BCEWithLogitsLoss()
     sigmoid = nn.Sigmoid()
 
@@ -106,7 +124,7 @@ def train(model, train_loader, val_loader, config,
     eval_f1s = []
 
     patience = 0
-    my_patience = 4
+    my_patience = 5
 
     method = config["method"]
 
@@ -152,6 +170,8 @@ def train(model, train_loader, val_loader, config,
                 loss.backward()
                 # clip_grad_norm_(model.parameters(), max_norm=1., norm_type=2)
                 optimizer.step()
+                if scheduler_step > 0 and epoch < scheduler_last_epoch:
+                    scheduler.step()
                 output = sigmoid(output)
                 # Computing predictions
                 batch_size_ = y.size(0)
@@ -179,13 +199,12 @@ def train(model, train_loader, val_loader, config,
             if eval_accu > best_accu:
                 best_accu = eval_accu
                 # Save model
-                save_model(model, name, optimizer, epoch, train_loss_history)
+                save_model(model, name, optimizer, scheduler, epoch, train_loss_history, config)
                 patience = 0
             else:
                 patience += 1
-                if patience >= my_patience:
+                if patience >= my_patience and early_stopping:
                     print(f"Ran out of patience at epoch {epoch}.")
                     return eval_losses, eval_accus, eval_f1s
-                
-
+    
     return eval_losses, eval_accus, eval_f1s

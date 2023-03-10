@@ -140,21 +140,26 @@ class MLP(nn.Module):
 
 
 class SimpleMLP(nn.Module):
-    def __init__(self, input_size, layers, hidden_size, dropout=0):
+    def __init__(self, input_size, nb_layers, hidden_size, dropout=0):
         super(SimpleMLP, self).__init__()
-        layer_sizes = [input_size] + [hidden_size]*(layers-1) + [1]
-        layers = []
-        for i in range(len(layer_sizes)-1):
-            layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
-            if i < len(layer_sizes)-2:
-                layers.append(nn.ReLU())
-                layers.append(nn.Dropout(p=dropout))
+        if nb_layers==1:
+            layers =[
+                nn.BatchNorm1d(input_size),
+                nn.Linear(input_size, 1)
+            ]
+        else:
+            layer_sizes = [input_size] + [hidden_size]*(nb_layers-1) + [1]
+            layers = []
+            for i in range(len(layer_sizes)-1):
+                # layers.append(nn.BatchNorm1d(layer_sizes[i]))
+                layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
+                if i < len(layer_sizes)-2:
+                    layers.append(nn.ReLU())
+                    layers.append(nn.Dropout(p=dropout))
         self.layers = nn.Sequential(*layers)
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.layers(x)
-        x = self.sigmoid(x)
         return x
 
 

@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .mlp import MLP, CompactMLP
+from .mlp import MLP, CompactMLP, SimpleMLP
 
 from .model_01.model import CorpusEncoder as CorpusEncoder01
 from .model_02.model import CorpusEncoder as CorpusEncoder02
@@ -85,11 +85,10 @@ class ClassificationHead(nn.Module):
         self.corpus_emb_dim = corpus_emb_dim
         self.nontext_dim = nontext_dim
         
-        self.mlp = CompactMLP(corpus_emb_dim + nontext_dim, layers, mlp_hidden_dim, dropout)
+        self.mlp = SimpleMLP(corpus_emb_dim + nontext_dim, layers, mlp_hidden_dim, dropout)
         self.apply(self.weights_init_uniform_rule)
 
     def forward(self, x_corpus, x_nontext):
-        # print("x_nontext is leaf : ", x_nontext.is_leaf)
         if (x_corpus is None or self.corpus_emb_dim == 0) and (x_nontext is None or self.nontext_dim == 0):
             raise ValueError("Both entries are None.")
         if x_corpus is None or self.corpus_emb_dim == 0:
@@ -98,7 +97,6 @@ class ClassificationHead(nn.Module):
             x = x_corpus
         else:
             x = torch.cat([x_corpus, x_nontext], dim=1).float()
-        # print("x before mlp is leaf: ", x.is_leaf)
         out = self.mlp(x)
         return out.view(-1)
 
@@ -146,7 +144,6 @@ class NontextualNetwork(nn.Module):
 class CorpusEncoder(nn.Module):
     """Generic Corpus encoder for both ECB and FED texts.
     """
-
     def __init__(self, method='model_01', separate=True, dropout=0.):
         """Initializes a Corpus Encoder with the given method.
 
@@ -272,15 +269,6 @@ class MyModel(nn.Module):
         super(MyModel, self).__init__()
         self.method = method
         self.dropout=dropout
-
-        # if has_nontext_network:
-        #     self.nontextual_pipeline = NontextualNetwork(
-        #         len(index_times), len(index_names), nontext_dim, layers_nontext=layers_nontext, dropout=dropout
-        #     )
-        #     self.nontext_dim = nontext_dim
-        # else:
-        #     self.nontextual_pipeline = None
-        #     self.nontext_dim = len(nontextual_cols)
 
         self.nontext_network = NontextualNetwork(input_dim=nontext_dim, input_channels=nontext_dim,  output_dim=nontext_dim)
         self.nontext_dim = self.nontext_network.output_dim

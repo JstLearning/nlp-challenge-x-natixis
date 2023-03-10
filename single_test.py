@@ -9,32 +9,45 @@ from model.framework_dataset import get_data_loader
 from train import train, evaluate
 
 # from preprocessing.preprocessing import ecb_pipeline_en, fast_detect
+from preprocessing.standard_scaler import get_column_transformer
 from config import Optimizer
 
 import torch
 import torch.nn as nn
 
+import datetime
+
 config = {
 
-    "method": None,
+    "method": "model_03",
 
-    "learning_rate": 2e-3,
+    "learning_rate": 1e-3,
 
-    "weight_decay": 5e-3,
+    "weight_decay": 1e-5,
 
-    "batch_size": 128,
+    "batch_size": 24,
 
-    "layers": ,
+    "layers": 3,
 
     "mlp_hidden_dim": 64,
 
-    "dropout": 0.6,
+    "dropout": 0.5,
 
-    "separate": True,
+    "separate": False,
     
     "max_corpus_len": 2,
 
-    "max_epochs": 20
+    "max_epochs": 50,
+
+    "scheduler_step": 5,
+
+    "scheduler_ratio": 0.3,
+
+    "scheduler_last_epoch": 40,
+
+    "early_stopping": False,
+
+    "preload": False
 
 }
 
@@ -96,6 +109,14 @@ def main():
     # ecb["lang"] = ecb["text_"].apply(fast_detect)
     # fed["lang"] = fed["text"].apply(fast_detect)
 
+    # Preprocess numerical data
+    ct = get_column_transformer()
+
+    returns_train = pd.DataFrame(ct.fit_transform(returns_train), columns=returns_train.columns)
+    returns_val = pd.DataFrame(ct.transform(returns_val), columns=returns_train.columns)
+    returns_test = pd.DataFrame(ct.transform(returns_test), columns=returns_train.columns)
+
+
     train_set, train_loader, tokenizer, steps = get_data_loader(
     returns_train, ecb, fed, y_train, method=config["method"],
     separate=config["separate"], max_corpus_len=config["max_corpus_len"],
@@ -115,14 +136,14 @@ def main():
                     mlp_hidden_dim=config["mlp_hidden_dim"],
                     separate=config["separate"],
                     dropout=config["dropout"]).to(device)
-
+    name = str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
     max_epochs = config["max_epochs"]
     eval_losses, eval_accus, eval_f1s = \
         train(model, train_loader=train_loader, val_loader=val_loader,
-            config=config, device=device, max_epochs=max_epochs, eval_every=3,
-            name = f"No_NLP")
+            config=config, device=device, max_epochs=max_epochs, eval_every=5,
+            name = name)
     
-    with open(f"{config['method']}_{max_epochs}_epochs.json", "w") as f:
+    with open(f"outputs/{name}_{max_epochs}_epochs.json", "w") as f:
         json.dump({
             "config": config,
             "eval_losses": eval_losses,
