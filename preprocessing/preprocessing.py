@@ -122,8 +122,8 @@ def remove_refs_fed(text):
 
 def remove_greetings(text):
     if not text is None:
-        res = re.sub(r'^(.*?)Good (morning|afternoon|evening)[^.]*\.', '', text)
-        res = re.sub(r'^(.*?)Ladies and (g|G)entlemen[^.]*\.', '', res)
+        res = re.sub(r'^(.*?)Good (morning|afternoon|evening)[^.]*?\.', '', text)
+        res = re.sub(r'(l|L)adies and (g|G)entlemen[^.]*?\.', '', res)
         res = re.sub(r'Hello.', '', res)
         return res.strip()
     return text
@@ -133,9 +133,10 @@ def pipeline_en(x, tolist=False):
     if res is None:
         return x["title"]
     res = numbered_reference_removal(res)
+    res = reference_removal_en(res)
     res = first_date_extractor(res)
     res = remove_greetings(res)
-    res = reference_removal_en(res)
+    res = find_useless_thanks(res)
     res = tag_removal(res).strip()
     res = summarizeLine(res, tolist)
 
@@ -170,12 +171,12 @@ def main():
     # fed["lang"] = fed["text"].apply(fast_detect)
 
 
-    # ecb["text_"] = ecb.apply(pipeline_en, axis=1)
+    ecb["text_"] = ecb.apply(pipeline_en, axis=1)
 
-    # with open("../data/ecb_data_preprocessed.csv", "w+", encoding="utf-8") as f:
-    #     ecb.to_csv(f)
+    with open("../data/ecb_data_preprocessed.csv", "w+", encoding="utf-8") as f:
+        ecb.to_csv(f)
     
-    # print("Finished preprocessing ECB texts.")
+    print("Finished preprocessing ECB texts.")
     
     fed["text_"] = fed.apply(pipeline_fed, axis=1)
 
