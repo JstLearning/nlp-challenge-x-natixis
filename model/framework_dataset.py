@@ -80,7 +80,7 @@ class ReturnsDataset(Dataset):
                 ecb_texts.append(self.filler)
 
             texts = self.fed.loc[index_fed]
-            fed_texts = list(texts[texts["lang"] == "en"]["text"])
+            fed_texts = list(texts[texts["lang"] == "en"]["text_"])
             while len(fed_texts) < self.max_corpus_len:
                 fed_texts.append(self.filler)
 
@@ -89,7 +89,7 @@ class ReturnsDataset(Dataset):
             while len(ecb_texts) < self.max_corpus_len:
                 ecb_texts.append(self.filler)
 
-            fed_texts = list(self.fed.loc[index_fed]["text"])
+            fed_texts = list(self.fed.loc[index_fed]["text_"])
             while len(fed_texts) < self.max_corpus_len:
                 fed_texts.append(self.filler)
         # Both ecb_texts and fed_texts should be of length max_corpus_len
@@ -246,7 +246,7 @@ def get_data_loader_distilbert(returns, ecb, fed, y,
             
             X_ind = torch.stack(X_ind, dim=0)
             Y = torch.Tensor(y)
-
+            print(X_text)
             X_text_tokens = tokenizer(X_text, return_tensors="pt",
                                       truncation=True, padding='max_length', max_length=512)
             # print(X_text_tokens)
