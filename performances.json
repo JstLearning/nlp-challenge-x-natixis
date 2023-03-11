@@ -1,1 +1,281 @@
-{"Title": "Performances of different attempts", "5": {"name": "5", "config": {"method": null, "learning_rate": 0.0002352991445609195, "weight_decay": 3.201972280095127e-05, "batch_size": 32, "layers": 10, "mlp_hidden_dim": 64, "separate": true, "dropout": 0.6210578299154438, "max_corpus_len": 2, "max_epochs": 10, "eval_every": 3}, "eval_losses": [0.688677526460455, 0.6783804295866895, 0.6781051056569951], "eval_accus": [54.443823365008384, 56.679709334823926, 56.791503633314704], "eval_f1s": [0.07909604519774012, 0.23795476892822023, 0.37510105092966856]}, "6": {"name": "6", "config": {"method": null, "learning_rate": 0.0014194682927487128, "weight_decay": 3.343685582615276e-05, "batch_size": 32, "layers": 2, "mlp_hidden_dim": 64, "separate": false, "dropout": 0.6709267853107771, "max_corpus_len": 2, "max_epochs": 10, "eval_every": 3}, "eval_losses": [0.6931471805599454, 0.6931471805599454, 0.6931471805599454], "eval_accus": [55.11458915595305, 55.11458915595305, 55.11458915595305], "eval_f1s": [0.0, 0.0, 0.0]}, "7": {"name": "7", "config": {"method": null, "learning_rate": 0.00010010327405726949, "weight_decay": 4.657825246538376e-05, "batch_size": 32, "layers": 1, "mlp_hidden_dim": 64, "separate": true, "dropout": 0.6312094838395981, "max_corpus_len": 2, "max_epochs": 10, "eval_every": 3}, "eval_losses": [0.7057842483262866, 0.7013028516070271, 0.69879555088159], "eval_accus": [54.108440469536056, 54.164337618781445, 54.499720514253774], "eval_f1s": [0.4800506649778341, 0.46891191709844565, 0.4477611940298507]}, "8": {"name": "8", "config": {"method": null, "learning_rate": 0.0022434253748280218, "weight_decay": 24407.36149146619, "batch_size": 16, "layers": 4, "mlp_hidden_dim": 64, "separate": true, "dropout": 0.22138866411261898, "max_corpus_len": 2, "max_epochs": 10, "eval_every": 3}, "eval_losses": [0.6931456685969799, 0.693146863517348, 0.6931485220003083], "eval_accus": [55.11458915595305, 55.11458915595305, 44.88541084404695], "eval_f1s": [0.0, 0.0, 0.6195987654320987]}, "9": {"name": "9", "config": {"method": null, "learning_rate": 0.0011550259419380751, "weight_decay": 2413.9864903740736, "batch_size": 32, "layers": 9, "mlp_hidden_dim": 64, "separate": false, "dropout": 0.2995221115064128, "max_corpus_len": 2, "max_epochs": 10, "eval_every": 3}, "eval_losses": [0.6931445225771103, 0.6931415849508845, 0.6931517055604702], "eval_accus": [55.11458915595305, 55.11458915595305, 44.88541084404695], "eval_f1s": [0.0, 0.0, 0.6195987654320987]}, "10": {"name": "10", "config": {"method": null, "learning_rate": 0.0007226884867927217, "weight_decay": 94003.01352898337, "batch_size": 16, "layers": 4, "mlp_hidden_dim": 64, "separate": false, "dropout": 0.5936903326329808, "max_corpus_len": 2, "max_epochs": 10, "eval_every": 3}, "eval_losses": [0.6931474244454033, 0.6931465708711694, 0.6931461684960388], "eval_accus": [44.88541084404695, 55.11458915595305, 55.11458915595305], "eval_f1s": [0.6195987654320987, 0.0, 0.0]}}
+{
+      "Title": "Performances of different attempts",
+      "5": {
+            "name": "5",
+            "config": {
+                  "method": null,
+                  "learning_rate": 0.0002352991445609195,
+                  "weight_decay": 3.201972280095127e-05,
+                  "batch_size": 32,
+                  "layers": 10,
+                  "mlp_hidden_dim": 64,
+                  "separate": true,
+                  "dropout": 0.6210578299154438,
+                  "max_corpus_len": 2,
+                  "max_epochs": 10,
+                  "eval_every": 3
+            },
+            "eval_losses": [
+                  0.688677526460455,
+                  0.6783804295866895,
+                  0.6781051056569951
+            ],
+            "eval_accus": [
+                  54.443823365008384,
+                  56.679709334823926,
+                  56.791503633314704
+            ],
+            "eval_f1s": [
+                  0.07909604519774012,
+                  0.23795476892822023,
+                  0.37510105092966856
+            ]
+      },
+      "6": {
+            "name": "6",
+            "config": {
+                  "method": null,
+                  "learning_rate": 0.0014194682927487128,
+                  "weight_decay": 3.343685582615276e-05,
+                  "batch_size": 32,
+                  "layers": 2,
+                  "mlp_hidden_dim": 64,
+                  "separate": false,
+                  "dropout": 0.6709267853107771,
+                  "max_corpus_len": 2,
+                  "max_epochs": 10,
+                  "eval_every": 3
+            },
+            "eval_losses": [
+                  0.6931471805599454,
+                  0.6931471805599454,
+                  0.6931471805599454
+            ],
+            "eval_accus": [
+                  55.11458915595305,
+                  55.11458915595305,
+                  55.11458915595305
+            ],
+            "eval_f1s": [
+                  0.0,
+                  0.0,
+                  0.0
+            ]
+      },
+      "7": {
+            "name": "7",
+            "config": {
+                  "method": null,
+                  "learning_rate": 0.00010010327405726949,
+                  "weight_decay": 4.657825246538376e-05,
+                  "batch_size": 32,
+                  "layers": 1,
+                  "mlp_hidden_dim": 64,
+                  "separate": true,
+                  "dropout": 0.6312094838395981,
+                  "max_corpus_len": 2,
+                  "max_epochs": 10,
+                  "eval_every": 3
+            },
+            "eval_losses": [
+                  0.7057842483262866,
+                  0.7013028516070271,
+                  0.69879555088159
+            ],
+            "eval_accus": [
+                  54.108440469536056,
+                  54.164337618781445,
+                  54.499720514253774
+            ],
+            "eval_f1s": [
+                  0.4800506649778341,
+                  0.46891191709844565,
+                  0.4477611940298507
+            ]
+      },
+      "8": {
+            "name": "8",
+            "config": {
+                  "method": null,
+                  "learning_rate": 0.0022434253748280218,
+                  "weight_decay": 24407.36149146619,
+                  "batch_size": 16,
+                  "layers": 4,
+                  "mlp_hidden_dim": 64,
+                  "separate": true,
+                  "dropout": 0.22138866411261898,
+                  "max_corpus_len": 2,
+                  "max_epochs": 10,
+                  "eval_every": 3
+            },
+            "eval_losses": [
+                  0.6931456685969799,
+                  0.693146863517348,
+                  0.6931485220003083
+            ],
+            "eval_accus": [
+                  55.11458915595305,
+                  55.11458915595305,
+                  44.88541084404695
+            ],
+            "eval_f1s": [
+                  0.0,
+                  0.0,
+                  0.6195987654320987
+            ]
+      },
+      "9": {
+            "name": "9",
+            "config": {
+                  "method": null,
+                  "learning_rate": 0.0011550259419380751,
+                  "weight_decay": 2413.9864903740736,
+                  "batch_size": 32,
+                  "layers": 9,
+                  "mlp_hidden_dim": 64,
+                  "separate": false,
+                  "dropout": 0.2995221115064128,
+                  "max_corpus_len": 2,
+                  "max_epochs": 10,
+                  "eval_every": 3
+            },
+            "eval_losses": [
+                  0.6931445225771103,
+                  0.6931415849508845,
+                  0.6931517055604702
+            ],
+            "eval_accus": [
+                  55.11458915595305,
+                  55.11458915595305,
+                  44.88541084404695
+            ],
+            "eval_f1s": [
+                  0.0,
+                  0.0,
+                  0.6195987654320987
+            ]
+      },
+      "10": {
+            "name": "10",
+            "config": {
+                  "method": null,
+                  "learning_rate": 0.0007226884867927217,
+                  "weight_decay": 94003.01352898337,
+                  "batch_size": 16,
+                  "layers": 4,
+                  "mlp_hidden_dim": 64,
+                  "separate": false,
+                  "dropout": 0.5936903326329808,
+                  "max_corpus_len": 2,
+                  "max_epochs": 10,
+                  "eval_every": 3
+            },
+            "eval_losses": [
+                  0.6931474244454033,
+                  0.6931465708711694,
+                  0.6931461684960388
+            ],
+            "eval_accus": [
+                  44.88541084404695,
+                  55.11458915595305,
+                  55.11458915595305
+            ],
+            "eval_f1s": [
+                  0.6195987654320987,
+                  0.0,
+                  0.0
+            ]
+      },
+      "1": {
+            "name": "2023-03-11 02-42-23-389949-hyperparam-search",
+            "config": {
+                  "method": "model_03",
+                  "learning_rate": 9.051926228574763e-06,
+                  "weight_decay": 3.767893434334594e-08,
+                  "batch_size": 8,
+                  "layers": 3,
+                  "mlp_hidden_dim": 512,
+                  "dropout": 0.1938652432924311,
+                  "separate": false,
+                  "learning_rate_min": 4.2727456351177463e-07,
+                  "max_corpus_len": 2,
+                  "max_epochs": 30,
+                  "scheduler_step": 15,
+                  "scheduler_ratio": 0.2,
+                  "scheduler_last_epoch": 24,
+                  "early_stopping": true,
+                  "preload": false,
+                  "eval_every": 1
+            },
+            "eval_losses": [
+                  0.6880433046578253,
+                  0.6911427003281412,
+                  0.689810672330895,
+                  0.6886001568135702,
+                  0.6902719747471128,
+                  0.6884061738389025
+            ],
+            "eval_accus": [
+                  55.11458915595305,
+                  55.11458915595305,
+                  55.11458915595305,
+                  55.11458915595305,
+                  55.11458915595305,
+                  55.11458915595305
+            ],
+            "eval_f1s": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0
+            ]
+      },
+      "2": {
+            "name": "2023-03-11 03-46-50-892884-hyperparam-search",
+            "config": {
+                  "method": "model_03",
+                  "learning_rate": 6.483549772986217e-05,
+                  "weight_decay": 1.1298903021663157e-07,
+                  "batch_size": 8,
+                  "layers": 6,
+                  "mlp_hidden_dim": 128,
+                  "dropout": 0.16352632165855474,
+                  "separate": false,
+                  "learning_rate_min": 1.4244425155247096e-06,
+                  "max_corpus_len": 2,
+                  "max_epochs": 30,
+                  "scheduler_step": 15,
+                  "scheduler_ratio": 0.2,
+                  "scheduler_last_epoch": 15,
+                  "early_stopping": true,
+                  "preload": false,
+                  "eval_every": 1
+            },
+            "eval_losses": [
+                  0.6888600626356939,
+                  0.6882209210499406,
+                  0.6879601429666795,
+                  0.6879213877180278,
+                  0.6885867496780469,
+                  0.6878971812333495
+            ],
+            "eval_accus": [
+                  55.11458915595305,
+                  55.11458915595305,
+                  55.11458915595305,
+                  55.11458915595305,
+                  55.11458915595305,
+                  55.11458915595305
+            ],
+            "eval_f1s": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0
+            ]
+      }
+}

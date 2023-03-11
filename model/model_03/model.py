@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import DistilBertTokenizer, DistilBertModel
+from transformers import RobertaTokenizer, RobertaModel
 
 
 torch.set_default_dtype(torch.float32)
@@ -111,7 +112,7 @@ class AttentionBiGRU(nn.Module):
 class DocumentEncoder(nn.Module):
     def __init__(self):
         super(DocumentEncoder, self).__init__()
-        self.text_encoder = DistilBertModel.from_pretrained("distilbert-base-uncased")
+        self.text_encoder = RobertaModel.from_pretrained("roberta-base")
     def forward(self, x, attention_mask=None):
         # Get a word embedding first. x is of shape (samples, steps=512)
         # attention_mask is of same size.

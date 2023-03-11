@@ -9,6 +9,8 @@ from train import train, evaluate
 import torch
 import torch.nn as nn
 
+import datetime
+
 config_dummy = {
 
     "method": "model_01",
@@ -46,31 +48,50 @@ class Optimizer(object):
         self.n_trials = n_trials
 
         def objective(trial):
+
+            learning_rate_exp = trial.suggest_float("lr_exp", -5, -4)
+
+            learning_rate_min_exp = trial.suggest_float("lr_min_exp", -7, learning_rate_exp)
+
             configs = {
 
-                "method": None,
+                "method": "model_03",
 
-                "learning_rate": 10**trial.suggest_float("lr_exp", -4, -2),
+                "learning_rate": 10**learning_rate_exp,
 
-                "weight_decay": 10**trial.suggest_float("weight_decay_exp", -5, 5),
+                "weight_decay": 10**trial.suggest_float("decay", -9, -5),
 
-                "batch_size": 2**trial.suggest_int("batch_size_exp", 4, 5),
+                "batch_size": 8,# trial.suggest_categorical("batch_size", [8, 16, 24]),
 
-                "layers": trial.suggest_int("layers", 1, 10),
+                "layers": trial.suggest_int("layers", 3, 6),
 
-                "mlp_hidden_dim": 64,
+                "mlp_hidden_dim": trial.suggest_categorical("mlp_hidden_dim", [128, 256, 512]),
 
-                "separate": trial.suggest_categorical("separate", [True, False]),
+                "dropout": trial.suggest_float("dropout", 0., 0.4),
 
-                "dropout": trial.suggest_float("dropout", 0.2, 0.7),
+                "separate": False,
 
+                "learning_rate_min": 10**learning_rate_min_exp,
+                
                 "max_corpus_len": 2,
 
-                "max_epochs": 10,
+                "max_epochs": 30,
 
-                "eval_every": 3
+                "scheduler_step": 15,
+
+                "scheduler_ratio": 0.2,
+
+                "scheduler_last_epoch": trial.suggest_int("last_scheduler_epoch", 5, 30),
+
+                "early_stopping": True,
+
+                "preload": False,
+                
+                "eval_every": 1
 
             }
+
+            print("Begin trial with configs: \n", configs)
 
 
             train_set, train_loader, _, steps = get_data_loader(
@@ -92,33 +113,33 @@ class Optimizer(object):
                             separate=configs["separate"],
                             dropout=configs["dropout"]).to(device)
             self.attempts += 1
+            name = str(datetime.datetime.today()).replace(':', '-').replace('.', '-') + "-hyperparam-search"
             eval_losses, eval_accus, eval_f1s = \
                 train(model, train_loader=train_loader, val_loader=val_loader,
                   config=configs, device=device, max_epochs=configs["max_epochs"], eval_every=configs["eval_every"],
-                  name = str(self.attempts))
+                  name = name)
             
             with open(f"performances.json", "r") as f:
                 perf_dict = json.load(f)
             
             perf_dict[self.attempts] = {
-                        "name": str(self.attempts),
+                        "name": name,
                         "config": configs,
                         "eval_losses": eval_losses,
                         "eval_accus": eval_accus,
                         "eval_f1s": eval_f1s
-
                         }
             
             with open(f"performances.json", "w") as f:
-                json.dump(perf_dict, f)
+                json.dump(perf_dict, f, indent=6)
             
-            return eval_losses[-1]
+            return np.min(eval_losses)
         
         self.objective = objective
         self.study = optuna.create_study(direction="minimize")
 
     def optimize(self):
-        self.study.optimize(self.objective, n_trials=self.n_trials, n_jobs=5)
+        self.study.optimize(self.objective, n_trials=self.n_trials, n_jobs=1)
 
     def get_best_params(self):
         return self.study.best_params, self.study.best_value

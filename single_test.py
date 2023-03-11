@@ -21,29 +21,31 @@ config = {
 
     "method": "model_03",
 
-    "learning_rate": 1e-3,
+    "learning_rate": 1e-5,
 
-    "weight_decay": 1e-5,
+    "weight_decay": 0,
 
-    "batch_size": 24,
+    "batch_size": 16,
 
-    "layers": 3,
+    "layers": 4,
 
-    "mlp_hidden_dim": 64,
+    "mlp_hidden_dim": 128,
 
-    "dropout": 0.5,
+    "dropout": 0,
 
     "separate": False,
+
+    "learning_rate_min": 1e-6,
     
     "max_corpus_len": 2,
 
-    "max_epochs": 50,
+    "max_epochs": 60,
 
-    "scheduler_step": 5,
+    "scheduler_step": 15,
 
-    "scheduler_ratio": 0.3,
+    "scheduler_ratio": 0.2,
 
-    "scheduler_last_epoch": 40,
+    "scheduler_last_epoch": 15,
 
     "early_stopping": False,
 
@@ -94,9 +96,11 @@ def main():
 
     ## Train test split: 60% train, 20% val, 20% test
 
+    small_dataset_size = 500 # len(y)//2
+
     returns_, returns_test, y_, y_test = train_test_split(
-        returns, y, test_size=0.2, train_size=0.8,
-        random_state=0, stratify=y
+        returns.iloc[:small_dataset_size], y.iloc[:small_dataset_size], test_size=0.2, train_size=0.8,
+        random_state=0, stratify=y.iloc[:small_dataset_size]
         )
 
     returns_train, returns_val, y_train, y_val = train_test_split(
@@ -122,7 +126,7 @@ def main():
     separate=config["separate"], max_corpus_len=config["max_corpus_len"],
     batch_size=config["batch_size"]
     )
-
+    # Use returns_train and y_train for overfit tests.
     val_set, val_loader, tokenizer, steps = get_data_loader(
         returns_val, ecb, fed, y_val, method=config["method"],
         separate=config["separate"], max_corpus_len=config["max_corpus_len"],
@@ -136,7 +140,10 @@ def main():
                     mlp_hidden_dim=config["mlp_hidden_dim"],
                     separate=config["separate"],
                     dropout=config["dropout"]).to(device)
-    name = str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
+
+    model.corpus_encoder.requires_grad_(False)
+    
+    name = str(datetime.datetime.today()).replace(':', '-').replace('.', '-') + "-freeze-bert"
     max_epochs = config["max_epochs"]
     eval_losses, eval_accus, eval_f1s = \
         train(model, train_loader=train_loader, val_loader=val_loader,

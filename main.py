@@ -3,6 +3,9 @@ import numpy as np
 
 from sklearn.model_selection import train_test_split
 
+from preprocessing.standard_scaler import get_column_transformer
+
+
 # from preprocessing.preprocessing import ecb_pipeline_en, fast_detect
 from config import Optimizer
 
@@ -64,6 +67,13 @@ def main():
     # ecb["lang"] = ecb["text_"].apply(fast_detect)
     # fed["lang"] = fed["text"].apply(fast_detect)
 
+    ct = get_column_transformer()
+
+    returns_train = pd.DataFrame(ct.fit_transform(returns_train), columns=returns_train.columns)
+    returns_val = pd.DataFrame(ct.transform(returns_val), columns=returns_train.columns)
+    returns_test = pd.DataFrame(ct.transform(returns_test), columns=returns_train.columns)
+
+
     optimizer = Optimizer(returns_train=returns_train,
                         returns_val=returns_val,
                         returns_test=returns_test,
@@ -72,7 +82,7 @@ def main():
                         y_test=y_test,
                         ecb=ecb,
                         fed=fed,
-                        n_trials=20)
+                        n_trials=30)
 
     optimizer.optimize()
     return optimizer

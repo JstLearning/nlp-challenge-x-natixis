@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.nn.utils import clip_grad_norm_
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 import numpy as np
 
 from utils import save_model, save_results
@@ -96,7 +96,9 @@ def evaluate(model, val_loader, config, device, name="", epoch=0):
 def train(model, train_loader, val_loader, config,
           device, max_epochs=25, eval_every=1, name="",
           train_loss_history=[], starting_epoch=1):
+    
     optimizer = Adam(model.parameters(),
+                     betas=(0.9, 0.98),
                      lr=config["learning_rate"],
                      weight_decay=config["weight_decay"])
     if config["preload"]:
@@ -109,11 +111,16 @@ def train(model, train_loader, val_loader, config,
     scheduler_step = config["scheduler_step"]
     early_stopping = config["early_stopping"]
     if scheduler_step > 0:
-        scheduler_ratio = config["scheduler_ratio"]
-        scheduler_last_epoch = config["scheduler_last_epoch"]
-        scheduler = StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_ratio)
+        if not config["preload"]:
+            scheduler_ratio = config["scheduler_ratio"]
+            scheduler_last_epoch = config["scheduler_last_epoch"]
+            lr_min = config["learning_rate_min"]
+            scheduler = CosineAnnealingLR(optimizer, T_max=scheduler_last_epoch, eta_min=lr_min)
+        else:
+            scheduler.load_state_dict(state['scheduler'])
     else:
-        scheduler.load_state_dict(state['scheduler'])
+        scheduler=None
+        
     criterion = nn.BCEWithLogitsLoss()
     sigmoid = nn.Sigmoid()
 
@@ -134,21 +141,19 @@ def train(model, train_loader, val_loader, config,
         correct = 0
         model.train()
         with tqdm(train_loader, unit="batch") as tepoch:
+            tepoch.set_description(f"Epoch {epoch}")
             for batch in tepoch:
-                # tqdm desc
-                tepoch.set_description(f"Epoch {epoch}")
-                optimizer.zero_grad()
-
+                # Get inputs
                 if method is None:
-                    X_ind, y = batch
+                    X_ind, y_ = batch
                     X_ind = torch.Tensor(X_ind).float().to(device)
-                    y = torch.Tensor(y).float().to(device)
+                    y_ = torch.Tensor(y_).float().to(device)
                     
                     X_text = None
                     X_mask = None
                 else:
                     X_ind = batch["X_ind"].to(device)
-                    y = batch["label"].to(device)
+                    y_ = batch["label"].to(device)
 
                     if config["separate"]:
                         X_ecb = batch["X_ecb"].to(device)
@@ -161,33 +166,38 @@ def train(model, train_loader, val_loader, config,
                     else:
                         X_text = (batch["X_text"].to(device),)
                         X_mask = (batch["X_mask"].to(device),)
-
-                output = model(X_text, X_mask, X_ind)
-                # print(output.size())
-                loss = criterion(output, y)
-                # print(loss.grad_fn)
                 
+                # Compute output
+                output = model(X_text, X_mask, X_ind)
+                # print(output)
+
+                # Compute loss
+                loss = criterion(output, y_)
+                
+                # Update model
                 loss.backward()
-                # clip_grad_norm_(model.parameters(), max_norm=1., norm_type=2)
                 optimizer.step()
-                if scheduler_step > 0 and epoch < scheduler_last_epoch:
-                    scheduler.step()
-                output = sigmoid(output)
+
                 # Computing predictions
-                batch_size_ = y.size(0)
-                output = output.round()
-                correct += (output == y).sum().item()
+
+                ## Batch loss
+                batch_loss = loss.item()
+
+                # Accuracy computation
+                output_proba = sigmoid(output)
+                batch_size_ = y_.size(0)
+                preds = output_proba.round()
+                correct += (preds == y_).sum().item()
+                ## Total loss with no reduction
                 total_loss += loss.item() * batch_size_
                 total_entries += batch_size_
-
-                # del X_ecb, X_ecb_att, X_fed, X_fed_att, X_ind, y, batch
-                gc.collect()
-                torch.cuda.empty_cache()
                 tepoch.set_postfix(loss=total_loss/total_entries,
-                                   accuracy=100. * correct/total_entries)
+                                    accuracy=100. * correct/total_entries,
+                                    batch_loss=batch_loss)
+        if (not scheduler is None) and epoch < scheduler_last_epoch:
+            scheduler.step()
         train_loss_history.append(total_loss/total_entries)
-        gc.collect()
-        torch.cuda.empty_cache()
+
         # Evaluation
         if epoch % eval_every == 0:
             eval_loss, eval_accu, eval_f1 = evaluate(

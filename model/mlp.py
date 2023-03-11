@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 from collections import OrderedDict
 
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
+        m.bias.data.fill_(0.)
+
 class MLPLayer(nn.Module):
     def __init__(self, input_dim, output_dim, dropout=.4):
         super(MLPLayer, self).__init__()
@@ -157,6 +162,8 @@ class SimpleMLP(nn.Module):
                     layers.append(nn.ReLU())
                     layers.append(nn.Dropout(p=dropout))
         self.layers = nn.Sequential(*layers)
+        with torch.no_grad():
+            self.apply(init_weights)
 
     def forward(self, x):
         x = self.layers(x)

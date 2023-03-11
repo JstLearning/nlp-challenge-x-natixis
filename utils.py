@@ -42,4 +42,4 @@ def save_results(outputs_proba, outputs, targets, logloss, name, epoch):
             "targets": targets.astype(str).tolist(),
             "logloss": str(logloss),
             "epoch": epoch
-        }, f)
+        }, f, indent=6)
