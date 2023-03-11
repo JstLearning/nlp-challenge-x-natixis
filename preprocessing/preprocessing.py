@@ -84,18 +84,69 @@ def summarizeLine(text, tolist=False):
         return text
     return res
 
+def find_footnote(x):
+    found = re.match(r"(.*)footnote", x, re.IGNORECASE)
+    if not found is None:
+        insensitive_footnote = re.compile(re.escape('footnote'), re.IGNORECASE)
+        return insensitive_footnote.sub("", found.group()).strip()
+    else:
+        return x
+
+def find_useless_thanks(x):
+    if x is not None:
+        found = re.findall(r"([^.]*?(thank | congratulat)[^.]*\.)", x, re.IGNORECASE)
+    if not found is None:
+        res = x
+        for substring in found:
+            res = re.sub(re.escape(substring[0]), "", res)
+        return res
+    return x
+
+def remove_video_code(text):
+    if not text is None:
+        res = re.sub("Accessible Keys for Video.*myPlayer\.play\(\);(.*?)\}(.*?)\}", "", text).strip()
+        res = re.sub("^(Watch|View) Video", "", res)
+        return res.strip()
+    return text
+
+def remove_refs_fed(text):
+    if not text is None:
+        res = re.sub(r'References.*', '', text)
+        res = re.sub(r'1\.(.+?)Return to text.*', '', res)
+        res = re.sub(r'Return to text.*', '', res)
+        return res.strip()
+    return text
+
+def remove_greetings(text):
+    if not text is None:
+        res = re.sub(r'^(.*?)Good (morning|afternoon|evening)[^.]*\.', '', text)
+        res = re.sub(r'^(.*?)Ladies and (g|G)entlemen[^.]*\.', '', res)
+        res = re.sub(r'Hello.', '', res)
+        return res.strip()
+    return text
 
 def pipeline_en(x, tolist=False):
     res = remove_title(x)
     if res is None:
         return x["title"]
     res = numbered_reference_removal(res)
+    res = remove_greetings(res)
     res = reference_removal_en(res)
     res = tag_removal(res).strip()
     res = first_date_extractor(res).strip()
     res = summarizeLine(res, tolist)
 
     return res
+
+def pipeline_fed(fed):
+    res = fed["text"].apply(find_footnote)
+    res = res.apply(remove_video_code)
+    res = res.apply(find_useless_thanks)
+    res = res.apply(remove_refs_fed)
+    res = res.apply(remove_greetings)
+    res = res.apply(website_remover)
+    fed["text_"] = res
+    return fed
 
 def fast_detect(x, bound=500):
     return detect(x[:min(len(x), bound)])
