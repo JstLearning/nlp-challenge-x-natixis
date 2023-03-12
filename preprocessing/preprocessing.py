@@ -1,6 +1,8 @@
 import re
 from collections import Counter
 from langdetect import detect
+from gensim.summarization import summarize
+import pandas as pd
 
 def numbered_reference_removal(text):
     # refs are typically in the form [n] in the text.
@@ -48,13 +50,15 @@ def first_date_extractor(text):
                      + 'Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|(Nov|Dec)(?:ember)?) (19|20)[0-9][0-9]',
                      '', text)
         return res
+    else:
+        return text
 
 def remove_title(x):
     if not x["text"] is None and isinstance(x["text"], str):
         res = re.sub(x["title"], '', x["text"]).strip()
         return res
     else:
-        return x["title"]
+        return None
 
 def website_remover(text):
     # Remove websites
@@ -72,16 +76,117 @@ def tag_removal(text):
     res = re.sub("Summary", "", res)
     return res
 
-def ecb_pipeline_en(x):
+
+def summarizeLine(text, tolist=False):
+    try:
+        res = summarize(text, word_count=500)
+        if len(res.split(" ")) < 50:
+            res = text
+        if tolist:
+            res = res.split("\n")
+    except:
+        return text
+    return res
+
+def find_footnote(x):
+    if x is not None and isinstance(x, str):
+        found = re.match(r"(.*)footnote", x, re.IGNORECASE)
+        if not found is None:
+            insensitive_footnote = re.compile(re.escape('footnote'), re.IGNORECASE)
+            return insensitive_footnote.sub("", found.group()).strip()
+    return x
+
+def find_useless_thanks(x):
+    if x is not None and isinstance(x, str):
+        found = re.findall(r"([^.]*?(thank | congratulat)[^.]*\.)", x, re.IGNORECASE)
+        if not found is None:
+            res = x
+            for substring in found:
+                res = re.sub(re.escape(substring[0]), "", res)
+            return res
+    return x
+
+def remove_video_code(text):
+    if not text is None:
+        res = re.sub("Accessible Keys for Video.*myPlayer\.play\(\);(.*?)\}(.*?)\}", "", text).strip()
+        res = re.sub("^(Watch|View) Video", "", res)
+        return res.strip()
+    return text
+
+def remove_refs_fed(text):
+    if not text is None:
+        res = re.sub(r'References.*', '', text)
+        res = re.sub(r'Return to text.*$', '', res)
+        return res.strip()
+    return text
+
+def remove_greetings(text):
+    if not text is None:
+        res = re.sub(r'^(.*?)Good (morning|afternoon|evening)[^.]*?\.', '', text)
+        res = re.sub(r'(l|L)adies and (g|G)entlemen[^.]*?\.', '', res)
+        res = re.sub(r'Hello.', '', res)
+        return res.strip()
+    return text
+
+def pipeline_en(x, tolist=False):
     res = remove_title(x)
     if res is None:
-        return res
+        return x["title"]
     res = numbered_reference_removal(res)
     res = reference_removal_en(res)
+    res = first_date_extractor(res)
+    res = remove_greetings(res)
+    res = find_useless_thanks(res)
     res = tag_removal(res).strip()
-    res = first_date_extractor(res).strip()
+    res = summarizeLine(res, tolist)
 
+    return res
+
+def pipeline_fed(x, tolist=False):
+    res = x["title"]
+    text = x["text"]
+    if not text is None and isinstance(text, str):
+        res = find_footnote(text)
+        res = remove_video_code(res)
+        res = find_useless_thanks(res)
+        res = remove_refs_fed(res)
+        res = remove_greetings(res)
+        res = website_remover(res)
+        res = summarizeLine(res, tolist)
     return res
 
 def fast_detect(x, bound=500):
     return detect(x[:min(len(x), bound)])
+
+
+def main():
+    FILENAME_ECB = "../data/ecb_data.csv"
+    FILENAME_FED = "../data/fed_data.csv"
+
+    ecb = pd.read_csv(FILENAME_ECB, index_col=0)
+    fed = pd.read_csv(FILENAME_FED, index_col=0)
+
+    
+    # ecb["lang"] = ecb["text_"].apply(fast_detect)
+    # fed["lang"] = fed["text"].apply(fast_detect)
+
+
+    ecb["text_"] = ecb.apply(pipeline_en, axis=1)
+
+    with open("../data/ecb_data_preprocessed.csv", "w+", encoding="utf-8") as f:
+        ecb.to_csv(f)
+    
+    print("Finished preprocessing ECB texts.")
+    
+    fed["text_"] = fed.apply(pipeline_fed, axis=1)
+
+    with open("../data/fed_data_preprocessed.csv", "w+", encoding="utf-8") as f:
+        fed.to_csv(f)
+    
+    print("Finished preprocessing FED texts.")
+
+
+    print("Finished preprocessing.")
+
+if __name__=="__main__":
+    main()
