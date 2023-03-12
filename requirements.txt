@@ -13,5 +13,6 @@ transformers
 optuna
 langdetect
 huggingface_hub
+gensim==3.8.1
 
 torch
