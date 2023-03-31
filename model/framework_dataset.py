@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -57,6 +58,7 @@ class ReturnsDataset(Dataset):
         self.separate = separate
         self.max_corpus_len = max_corpus_len
         self.filler = filler
+        self.rng = np.random.RandomState(seed=0)
 
         assert max_corpus_len < 5, \
             f"The max amount of texts in a corpus is 4. Got {max_corpus_len=}"
@@ -66,10 +68,12 @@ class ReturnsDataset(Dataset):
         index_ecb = self.returns.iloc[index]["index ecb"]
         index_ecb = [int(i) for i in index_ecb.split(",")]
         index_ecb = index_ecb[:min(self.max_corpus_len, len(index_ecb))]
+        # index_ecb = self.rng.choice(index_ecb, size=min(self.max_corpus_len, len(index_ecb)), replace=False)
 
         index_fed = self.returns.iloc[index]["index fed"]
         index_fed = [int(i) for i in index_fed.split(",")]
         index_fed = index_fed[:min(self.max_corpus_len, len(index_fed))]
+        # index_fed = self.rng.choice(index_fed, size=min(self.max_corpus_len, len(index_fed)), replace=False)
 
         # For a simple model, we will only pick texts in english.
         if self.english_only:
@@ -141,7 +145,7 @@ def get_data_loader(returns, ecb, fed, y,
             filler=""
         )
     elif method == "model_03":
-        return get_data_loader_roberta(
+        return get_data_loader_distilbert(
             returns, ecb, fed, y,
             separate=separate,
             batch_size=batch_size,
@@ -246,7 +250,7 @@ def get_data_loader_distilbert(returns, ecb, fed, y,
             
             X_ind = torch.stack(X_ind, dim=0)
             Y = torch.Tensor(y)
-            print(X_text)
+            # print(X_text)
             X_text_tokens = tokenizer(X_text, return_tensors="pt",
                                       truncation=True, padding='max_length', max_length=512)
             # print(X_text_tokens)

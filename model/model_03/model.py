@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from transformers import DistilBertTokenizer, DistilBertModel
 from transformers import RobertaTokenizer, RobertaModel
+from ..mlp import SimpleMLP
 
 
 torch.set_default_dtype(torch.float32)
@@ -112,7 +113,7 @@ class AttentionBiGRU(nn.Module):
 class DocumentEncoder(nn.Module):
     def __init__(self):
         super(DocumentEncoder, self).__init__()
-        self.text_encoder = RobertaModel.from_pretrained("roberta-base")
+        self.text_encoder = DistilBertModel.from_pretrained('distilbert-base-uncased')
     def forward(self, x, attention_mask=None):
         # Get a word embedding first. x is of shape (samples, steps=512)
         # attention_mask is of same size.
@@ -168,11 +169,11 @@ class Pooling(nn.Module):
     
 
 class CorpusEncoder(nn.Module):
-    def __init__(self, bias=True, dropout=.5):
+    def __init__(self, nb_layers=5, out_features=32, dropout=.5):
         super(CorpusEncoder, self).__init__()
         self.doc_encoder = DocumentEncoder()
-        self.W = nn.Linear(in_features=768, out_features=32)
-        self.corpus_emb_dim = 768
+        self.mlp = SimpleMLP(input_size=768, nb_layers=nb_layers, hidden_size=256,  out_features=out_features, dropout=dropout)
+        self.corpus_emb_dim = out_features
         self.pooling = Pooling(input_dim = 768, output_dim = self.corpus_emb_dim, pooling='sum', dropout=dropout)
     
     def forward(self, x, attention_mask=None):
@@ -185,7 +186,8 @@ class CorpusEncoder(nn.Module):
         # print("mask : ", attention_mask.size())
         # print("Encode document")
         x = self.doc_encoder(x, attention_mask_)
-        # x is now in shape (samples * nb_docs, features=768)
+        x = self.mlp(x)
+        # x is now in shape (samples * nb_docs, features=out_features)
         x = x.view(batch_size, nb_docs, -1)
         # x is once again in shape (samples, nb_docs, features=768)
         # We reduce the nb of docs with max pooling.

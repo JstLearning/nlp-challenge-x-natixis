@@ -1,1 +1,0 @@
-{"config": {"method": "model_03", "learning_rate": 0.001, "weight_decay": 0.0, "batch_size": 16, "layers": 3, "dropout": 0.5, "separate": true, "max_corpus_len": 2, "max_epochs": 30}, "eval_losses": [0.687948991360779, 0.6886243609958284, 0.6882202110855589], "eval_accus": [55.11458915595305, 55.11458915595305, 55.11458915595305], "eval_f1s": [0.0, 0.0, 0.0]}

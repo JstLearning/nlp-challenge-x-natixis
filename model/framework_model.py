@@ -17,11 +17,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .mlp import MLP, CompactMLP, SimpleMLP
+from .mlp import MLP, CompactMLP, SimpleMLP, init_weights
+from .vector_attention import VectorAttention, CNN1D, ResidualCNN, Residual1DCNN
 
 from .model_01.model import CorpusEncoder as CorpusEncoder01
 from .model_02.model import CorpusEncoder as CorpusEncoder02
-from .model_03.model import CorpusEncoder as CorpusEncoder03
+from .model_03.model import CorpusEncoder as CorpusEncoder03, AttentionWithContext
 
 import numpy as np
 
@@ -79,14 +80,19 @@ class ClassificationHead(nn.Module):
     This is just a MLP.
     """
     
-    def __init__(self, corpus_emb_dim, nontext_dim, layers=3, mlp_hidden_dim=128, dropout=0):
+    def __init__(self, corpus_emb_dim, nontext_dim, layers=3, mlp_hidden_dim=128, dropout=0, residual=False):
         super(ClassificationHead, self).__init__()
         self.layers = layers
         self.corpus_emb_dim = corpus_emb_dim
         self.nontext_dim = nontext_dim
-        
-        self.mlp = SimpleMLP(corpus_emb_dim + nontext_dim, layers, mlp_hidden_dim, dropout)
-        self.apply(self.weights_init_uniform_rule)
+        # print(nontext_dim, layers, mlp_hidden_dim)
+        if residual:
+            self.mlp = CompactMLP(nontext_dim, layers, mlp_hidden_dim, out_features=1, dropout=dropout)
+        else:
+            self.mlp = SimpleMLP(nontext_dim, layers, mlp_hidden_dim, out_features=1, dropout=dropout)
+        self.vector_attention = VectorAttention(nontext_dim)
+        self.proj = nn.Linear(corpus_emb_dim, nontext_dim, bias=False)
+        self.apply(init_weights)
 
     def forward(self, x_corpus, x_nontext):
         if (x_corpus is None or self.corpus_emb_dim == 0) and (x_nontext is None or self.nontext_dim == 0):
@@ -96,25 +102,18 @@ class ClassificationHead(nn.Module):
         elif x_nontext is None or self.nontext_dim == 0:
             x = x_corpus
         else:
-            x = torch.cat([x_corpus, x_nontext], dim=1).float()
+            # x = torch.cat([x_corpus, x_nontext], dim=1).float()
+            # Vector attention
+            x_corpus = self.proj(x_corpus)
+            # print(x_corpus.size(), x_nontext.size())
+            x = self.vector_attention(sequence=x_nontext, vector=x_corpus)
         out = self.mlp(x)
         return out.view(-1)
-
-    def weights_init_uniform_rule(self, m):
-        classname = m.__class__.__name__
-        # for every Linear layer in a model..
-        if classname.find('Linear') != -1:
-            # get the number of the inputs
-            n = m.in_features
-            y = 1.0/np.sqrt(n)
-            m.weight.data.uniform_(-y, y)
-            m.bias.data.fill_(0)
     
 
 class NontextualNetwork(nn.Module):
     """
     A network to process nontextual data.
-    For this, we do nothing...
     """
     
     def __init__(self, input_dim, input_channels, output_dim=nontext_dim, layers_nontext=3, dropout=0):
@@ -123,18 +122,24 @@ class NontextualNetwork(nn.Module):
         self.input_dim = input_dim
         self.input_channels = input_channels
         self.output_dim = output_dim
+        self.category_embedding = nn.Linear(9, input_channels-1, bias=True)
+        self.cnn = CNN1D(input_channels, output_dim, layers_nontext, dropout)
+        
 
     def forward(self, x):
         """Forward method for the NontextualNetwork.
-
-        Args:
-            x (Tensor): Tensor of size [batch_size, in_channels, nb_features].
-                In our case, the number of channels corresponds to the amount of
-                dummies for the one-hot encoding.
-
-        Returns:
-            Tensor: Tensor of size [batch_size, output_dim]
         """
+        x_ = x[:, :10]
+        category = x[:, 10:]
+        # x is of size (batch_size, 10)
+        cat_feat = self.category_embedding(category).unsqueeze(-1) # (batch_size, 15, 1)
+        cat_feat = cat_feat.repeat(1, 1, x_.size(1))
+        x = torch.cat([cat_feat, x_.unsqueeze(1)], dim=1).float()
+        # (batch_size, input_channels, 10)
+        x = self.cnn(x)
+        # x = x.transpose(2, 1)
+        #x = x.unsqueeze(-1)
+        # x is of shape (batch_size, L=10, H_out=output_dim)
         return x
         
 
@@ -144,7 +149,7 @@ class NontextualNetwork(nn.Module):
 class CorpusEncoder(nn.Module):
     """Generic Corpus encoder for both ECB and FED texts.
     """
-    def __init__(self, method='model_01', separate=True, dropout=0.):
+    def __init__(self, kwargs_ce, method='model_01', separate=True):
         """Initializes a Corpus Encoder with the given method.
 
         Args:
@@ -157,7 +162,6 @@ class CorpusEncoder(nn.Module):
         super(CorpusEncoder, self).__init__()
         self.method = method
         self.separate=separate
-        self.dropout=dropout
 
         if self.method=='bow':
             self.corpus_emb_dim = 1 * (1 + int(separate))
@@ -169,36 +173,16 @@ class CorpusEncoder(nn.Module):
             # https://huggingface.co/kiddothe2b/hierarchical-transformer-I3-mini-1024
             self.corpus_emb_dim = 1 * (1 + int(separate))
             # self.encoder = Model()
-        elif self.method=='model_01':
-            self.corpus_emb_dim = 32 * (1 + int(separate))
-            if not separate:
-                self.encoder = CorpusEncoder01(dropout=dropout)
-                self.encoder_ecb = None
-                self.encoder_fed = None
-            else:
-                self.encoder = None
-                self.encoder_ecb = CorpusEncoder01(dropout=dropout)
-                self.encoder_fed = CorpusEncoder01(dropout=dropout)
-        elif self.method=='model_02':
-            self.corpus_emb_dim = 32 * (1 + int(separate))
-            if not separate:
-                self.encoder = CorpusEncoder02(dropout=dropout)
-                self.encoder_ecb = None
-                self.encoder_fed = None
-            else:
-                self.encoder = None
-                self.encoder_ecb = CorpusEncoder03(dropout=dropout)
-                self.encoder_fed = CorpusEncoder03(dropout=dropout)
         elif self.method=='model_03':
             if not separate:
-                self.encoder = CorpusEncoder03(dropout=dropout)
+                self.encoder = CorpusEncoder03(**kwargs_ce)
                 self.encoder_ecb = None
                 self.encoder_fed = None
                 self.corpus_emb_dim = self.encoder.corpus_emb_dim
             else:
                 self.encoder = None
-                self.encoder_ecb = CorpusEncoder03(dropout=dropout)
-                self.encoder_fed = CorpusEncoder03(dropout=dropout)
+                self.encoder_ecb = CorpusEncoder03(**kwargs_ce)
+                self.encoder_fed = CorpusEncoder03(**kwargs_ce)
                 self.corpus_emb_dim = 2*self.encoder_ecb.corpus_emb_dim
         elif self.method is None:
             self.corpus_emb_dim = 0
@@ -249,8 +233,7 @@ class MyModel(nn.Module):
 
     One can process the nontextual features with a pipeline, for instance a CNN.
     """
-    def __init__(self, has_nontext_network=False, nontext_dim=nontext_dim, layers_nontext=3, mlp_hidden_dim=128,
-                 method='model_01', separate=True, layers=3, dropout=0.3):
+    def __init__(self, method, kwargs_nontext, kwargs_classification, kwargs_ce, separate=True):
         """_summary_
 
         Args:
@@ -268,17 +251,15 @@ class MyModel(nn.Module):
 
         super(MyModel, self).__init__()
         self.method = method
-        self.dropout=dropout
 
-        self.nontext_network = NontextualNetwork(input_dim=nontext_dim, input_channels=nontext_dim,  output_dim=nontext_dim)
+        self.nontext_network = NontextualNetwork(**kwargs_nontext)
         self.nontext_dim = self.nontext_network.output_dim
 
-        self.corpus_encoder = CorpusEncoder(method=method, separate=separate, dropout=dropout)
+        self.corpus_encoder = CorpusEncoder(kwargs_ce, method=method, separate=separate,)
 
         corpus_emb_dim = self.corpus_encoder.corpus_emb_dim
         
-        self.classifier = ClassificationHead(corpus_emb_dim=corpus_emb_dim, nontext_dim=self.nontext_dim,
-                                             layers=layers, mlp_hidden_dim=mlp_hidden_dim, dropout=dropout)
+        self.classifier = ClassificationHead(**kwargs_classification)
     
     def forward(self, x_text, x_masks, x_nontext):
         """Forward method for the general framework.

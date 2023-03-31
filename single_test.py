@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import json
 
+from model.mlp import SimpleMLP
+
 from sklearn.model_selection import train_test_split
 
 from model.framework_model import MyModel
@@ -10,6 +12,8 @@ from train import train, evaluate
 
 # from preprocessing.preprocessing import ecb_pipeline_en, fast_detect
 from preprocessing.standard_scaler import get_column_transformer
+from preprocessing.outlier_detection import remove_outlier
+
 from config import Optimizer
 
 import torch
@@ -17,40 +21,58 @@ import torch.nn as nn
 
 import datetime
 
-config = {
+learning_rate_exp = -4
 
-    "method": "model_03",
+learning_rate_min_exp = -7
 
-    "learning_rate": 1e-5,
+nontext_dim = 2**7
 
-    "weight_decay": 0,
+separate=False
 
-    "batch_size": 16,
+corpus_emb_dim = 2**7
 
-    "layers": 4,
 
-    "mlp_hidden_dim": 128,
+kwargs_nontext = {
+    "input_dim": 19,
+    "input_channels": 2**4,
+    "output_dim": nontext_dim,
+    "layers_nontext": 7,
+    "dropout": 0.4
+}
 
-    "dropout": 0,
+kwargs_ce = {
+    "out_features": corpus_emb_dim,
+    "nb_layers": 5,
+    "dropout": 0
+}
 
-    "separate": False,
+kwargs_classification = {
+    "corpus_emb_dim": corpus_emb_dim,
+    "nontext_dim": nontext_dim,
+    "layers": 8,
+    "mlp_hidden_dim": 2**8,
+    "dropout": 0.2,
+    "residual": False
+}
 
-    "learning_rate_min": 1e-6,
-    
-    "max_corpus_len": 2,
-
-    "max_epochs": 60,
-
-    "scheduler_step": 15,
-
-    "scheduler_ratio": 0.2,
-
-    "scheduler_last_epoch": 15,
-
-    "early_stopping": False,
-
-    "preload": False
-
+config =  {
+        "method": "model_03",
+        "learning_rate": 10**learning_rate_exp,
+        "weight_decay": 0,
+        "batch_size": 16,
+        "separate": separate,
+        "learning_rate_min": 10**learning_rate_min_exp,
+        "max_corpus_len": 2,
+        "max_epochs": 200,
+        "scheduler_step": 15,
+        "scheduler_ratio": 0.2,
+        "scheduler_last_epoch": 15,
+        "kwargs_nontext": kwargs_nontext,
+        "kwargs_ce": kwargs_ce,
+        "kwargs_classification": kwargs_classification,
+        "early_stopping": False,
+        "preload": False,
+        "eval_every": 1
 }
 
 def main():
@@ -65,6 +87,7 @@ def main():
     fed = pd.read_csv(FILENAME_FED, index_col=0)
 
     # Preprocessing
+    returns = remove_outlier(returns)
 
     ## One hot encoding
     returns = pd.get_dummies(returns, columns=["Index Name"])
@@ -96,11 +119,11 @@ def main():
 
     ## Train test split: 60% train, 20% val, 20% test
 
-    small_dataset_size = 500 # len(y)//2
+    small_dataset_size = len(y)//2
 
     returns_, returns_test, y_, y_test = train_test_split(
-        returns.iloc[:small_dataset_size], y.iloc[:small_dataset_size], test_size=0.2, train_size=0.8,
-        random_state=0, stratify=y.iloc[:small_dataset_size]
+        returns[:small_dataset_size], y[:small_dataset_size], test_size=0.2, train_size=0.8,
+        random_state=0, stratify=y[:small_dataset_size]
         )
 
     returns_train, returns_val, y_train, y_val = train_test_split(
@@ -135,15 +158,13 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = MyModel(method=config["method"],
-                    layers=config["layers"],
-                    mlp_hidden_dim=config["mlp_hidden_dim"],
-                    separate=config["separate"],
-                    dropout=config["dropout"]).to(device)
+    model = MyModel(config["method"],
+                    kwargs_nontext, kwargs_classification, kwargs_ce,
+                    separate=config["separate"]).to(device)
 
-    model.corpus_encoder.requires_grad_(False)
+    # model.corpus_encoder.requires_grad_(False)
     
-    name = str(datetime.datetime.today()).replace(':', '-').replace('.', '-') + "-freeze-bert"
+    name = str(datetime.datetime.today()).replace(':', '-').replace('.', '-') + "-preload-cnn"
     max_epochs = config["max_epochs"]
     eval_losses, eval_accus, eval_f1s = \
         train(model, train_loader=train_loader, val_loader=val_loader,

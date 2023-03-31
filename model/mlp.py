@@ -5,7 +5,8 @@ from collections import OrderedDict
 def init_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
-        m.bias.data.fill_(0.)
+        if not m.bias is None:
+            m.bias.data.fill_(0.)
 
 class MLPLayer(nn.Module):
     def __init__(self, input_dim, output_dim, dropout=.4):
@@ -72,7 +73,7 @@ class DownsamplingBlock(nn.Module):
         return out
 
 class MLP(nn.Module):
-    def __init__(self, input_dim, nb_layers, mlp_hidden_dim=64, dropout=0.):
+    def __init__(self, input_dim, nb_layers, mlp_hidden_dim=64, out_features=1, dropout=0.):
         super(MLP, self).__init__()
         assert nb_layers > 0
         self.input_dim = input_dim
@@ -81,7 +82,7 @@ class MLP(nn.Module):
 
         if nb_layers==1:
             self.layers = MLPLayer(input_dim=input_dim,
-                                    output_dim=1,
+                                    output_dim=out_features,
                                     dropout=dropout)
         elif nb_layers==2:
             self.hidden_dim = mlp_hidden_dim
@@ -90,7 +91,7 @@ class MLP(nn.Module):
                             output_dim=self.hidden_dim,
                             dropout=dropout),
                 MLPLayer(input_dim=self.hidden_dim,
-                            output_dim=1,
+                            output_dim=out_features,
                             dropout=dropout)
             )
         elif nb_layers==3:
@@ -101,7 +102,7 @@ class MLP(nn.Module):
                             dropout=dropout),
                 nn.Linear(self.hidden_dim, self.hidden_dim),
                 nn.ReLU(),
-                nn.Linear(self.hidden_dim, 1),
+                nn.Linear(self.hidden_dim, out_features),
             )
         else:
             hidden_dim = 2 ** (4 + nb_layers)
@@ -129,7 +130,7 @@ class MLP(nn.Module):
             )
             layers_dict['Last_ReLU'] = nn.ReLU()
             layers_dict['Last_Linear'] = nn.Linear(
-                hidden_dim, 1
+                hidden_dim, out_features
             )
 
             self.layers = nn.Sequential(layers_dict)
@@ -145,18 +146,19 @@ class MLP(nn.Module):
 
 
 class SimpleMLP(nn.Module):
-    def __init__(self, input_size, nb_layers, hidden_size, dropout=0):
+    def __init__(self, input_size, nb_layers, hidden_size, out_features=1, dropout=0):
         super(SimpleMLP, self).__init__()
         if nb_layers==1:
             layers =[
                 nn.BatchNorm1d(input_size),
-                nn.Linear(input_size, 1)
+                nn.Linear(input_size, out_features)
             ]
         else:
-            layer_sizes = [input_size] + [hidden_size]*(nb_layers-1) + [1]
+            layer_sizes = [input_size] + [hidden_size]*(nb_layers-1) + [out_features]
             layers = []
             for i in range(len(layer_sizes)-1):
-                # layers.append(nn.BatchNorm1d(layer_sizes[i]))
+                if i == len(layer_sizes)-2:
+                    layers.append(nn.BatchNorm1d(layer_sizes[i]))
                 layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
                 if i < len(layer_sizes)-2:
                     layers.append(nn.ReLU())
@@ -171,9 +173,9 @@ class SimpleMLP(nn.Module):
 
 
 class CompactMLP(nn.Module):
-    def __init__(self, input_size, nb_layers, hidden_size, dropout_prob=0.0):
+    def __init__(self, input_size, nb_layers, hidden_size, out_features=1, dropout=0.0):
         super(CompactMLP, self).__init__()
-        output_size = 1
+        output_size = out_features
         hidden_sizes = [hidden_size] * (nb_layers-1)
         layer_sizes = [input_size] + hidden_sizes
         layers = []
@@ -181,7 +183,7 @@ class CompactMLP(nn.Module):
             layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
             layers.append(nn.BatchNorm1d(layer_sizes[i+1]))
             layers.append(nn.ReLU())
-            layers.append(nn.Dropout(p=dropout_prob))
+            layers.append(nn.Dropout(dropout))
             if i > 0:
                 layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
         layers.append(nn.Linear(hidden_sizes[-1], output_size))

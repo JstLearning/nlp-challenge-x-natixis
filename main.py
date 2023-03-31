@@ -1,12 +1,15 @@
 import pandas as pd
 import numpy as np
 
+from model.mlp import SimpleMLP
+
 from sklearn.model_selection import train_test_split
 
 from preprocessing.standard_scaler import get_column_transformer
 
 
 # from preprocessing.preprocessing import ecb_pipeline_en, fast_detect
+from preprocessing.outlier_detection import remove_outlier
 from config import Optimizer
 
 def main():
@@ -21,6 +24,7 @@ def main():
     fed = pd.read_csv(FILENAME_FED, index_col=0)
 
     # Preprocessing
+    returns = remove_outlier(returns)
 
     ## One hot encoding
     returns = pd.get_dummies(returns, columns=["Index Name"])
@@ -82,7 +86,7 @@ def main():
                         y_test=y_test,
                         ecb=ecb,
                         fed=fed,
-                        n_trials=30)
+                        n_trials=10)
 
     optimizer.optimize()
     return optimizer

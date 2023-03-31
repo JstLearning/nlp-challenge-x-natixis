@@ -105,6 +105,9 @@ def train(model, train_loader, val_loader, config,
         state = torch.load(config["preload"])
         model.load_state_dict(state['model_state_dict'])
         optimizer.load_state_dict(state['optimizer'])
+        for g in optimizer.param_groups:
+            g['lr'] = config["learning_rate"]
+            g['weight_decay'] = config["weight_decay"]
         starting_epoch = state['epoch']
         train_loss_history = state['train_loss_history']
 
@@ -117,6 +120,7 @@ def train(model, train_loader, val_loader, config,
             lr_min = config["learning_rate_min"]
             scheduler = CosineAnnealingLR(optimizer, T_max=scheduler_last_epoch, eta_min=lr_min)
         else:
+            scheduler = CosineAnnealingLR(optimizer, T_max=config["scheduler_last_epoch"], eta_min=config["learning_rate_min"])
             scheduler.load_state_dict(state['scheduler'])
     else:
         scheduler=None
@@ -124,6 +128,7 @@ def train(model, train_loader, val_loader, config,
     criterion = nn.BCEWithLogitsLoss()
     sigmoid = nn.Sigmoid()
 
+    best_train_loss=5
     best_accu = 0
 
     eval_losses = []
@@ -131,7 +136,7 @@ def train(model, train_loader, val_loader, config,
     eval_f1s = []
 
     patience = 0
-    my_patience = 5
+    my_patience = 20 // eval_every
 
     method = config["method"]
 
@@ -206,8 +211,10 @@ def train(model, train_loader, val_loader, config,
             eval_accus.append(eval_accu)
             eval_f1s.append(eval_f1)
 
-            if eval_accu > best_accu:
-                best_accu = eval_accu
+            #if eval_accu > best_accu:
+            #    best_accu = eval_accu
+            if total_loss/total_entries < best_train_loss:
+                best_train_loss = total_loss/total_entries
                 # Save model
                 save_model(model, name, optimizer, scheduler, epoch, train_loss_history, config)
                 patience = 0

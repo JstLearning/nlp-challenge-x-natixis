@@ -49,47 +49,60 @@ class Optimizer(object):
 
         def objective(trial):
 
-            learning_rate_exp = trial.suggest_float("lr_exp", -5, -4)
+            learning_rate_exp = trial.suggest_float("learning_rate_exp", -6, -1)
 
-            learning_rate_min_exp = trial.suggest_float("lr_min_exp", -7, learning_rate_exp)
+            learning_rate_min_exp = trial.suggest_float("learning_rate_min_exp", -10, learning_rate_exp)
 
-            configs = {
+            nontext_dim = 2**trial.suggest_int("output_dim_exp", 4, 10)
 
-                "method": "model_03",
+            separate=False
 
-                "learning_rate": 10**learning_rate_exp,
+            corpus_emb_dim = 2**trial.suggest_int("out_features_ce", 5, 10)
 
-                "weight_decay": 10**trial.suggest_float("decay", -9, -5),
 
-                "batch_size": 8,# trial.suggest_categorical("batch_size", [8, 16, 24]),
-
-                "layers": trial.suggest_int("layers", 3, 6),
-
-                "mlp_hidden_dim": trial.suggest_categorical("mlp_hidden_dim", [128, 256, 512]),
-
-                "dropout": trial.suggest_float("dropout", 0., 0.4),
-
-                "separate": False,
-
-                "learning_rate_min": 10**learning_rate_min_exp,
-                
-                "max_corpus_len": 2,
-
-                "max_epochs": 30,
-
-                "scheduler_step": 15,
-
-                "scheduler_ratio": 0.2,
-
-                "scheduler_last_epoch": trial.suggest_int("last_scheduler_epoch", 5, 30),
-
-                "early_stopping": True,
-
-                "preload": False,
-                
-                "eval_every": 1
-
+            kwargs_nontext = {
+                "input_dim": 19,
+                "input_channels": 2**trial.suggest_int("input_channels_exp", 4, 8),
+                "output_dim": nontext_dim,
+                "layers_nontext": trial.suggest_int("layers_nontext", 2, 10),
+                "dropout": trial.suggest_float("dropout_nontext", 0.2, 0.5)
             }
+
+            kwargs_ce = {
+                "out_features": corpus_emb_dim,
+                "nb_layers": trial.suggest_int("nb_layers_ce", 3, 10),
+                "dropout": trial.suggest_float("dropout_ce", 0., 0.5)
+            }
+
+            kwargs_classification = {
+                "corpus_emb_dim": corpus_emb_dim,
+                "nontext_dim": nontext_dim,
+                "layers": trial.suggest_int("layers", 3, 10),
+                "mlp_hidden_dim": 2**trial.suggest_int("mlp_hidden_dim_exp", 4, 10),
+                "dropout": trial.suggest_float("dropout_classification", 0.1, 0.6),
+                "residual": trial.suggest_categorical("residual", [True, False])
+            }
+
+            configs =  {
+                  "method": "model_03",
+                  "learning_rate": 10**learning_rate_exp,
+                  "weight_decay": 10**trial.suggest_float("weight_decay_exp", -15, 0),
+                  "batch_size": 16,
+                  "separate": separate,
+                  "learning_rate_min": 10**learning_rate_min_exp,
+                  "max_corpus_len": 3,
+                  "max_epochs": 150,
+                  "scheduler_step": 15,
+                  "scheduler_ratio": 0.2,
+                  "scheduler_last_epoch": trial.suggest_int("scheduler_last_epoch", 5, 30),
+                  "kwargs_nontext": kwargs_nontext,
+                  "kwargs_ce": kwargs_ce,
+                  "kwargs_classification": kwargs_classification,
+                  "early_stopping": True,
+                  "preload": False,
+                  "eval_every": 2
+            }
+
 
             print("Begin trial with configs: \n", configs)
 
@@ -108,12 +121,12 @@ class Optimizer(object):
 
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-            model = MyModel(method=configs["method"],
-                            layers=configs["layers"],
-                            separate=configs["separate"],
-                            dropout=configs["dropout"]).to(device)
+            model = MyModel(configs["method"],
+                            kwargs_nontext, kwargs_classification, kwargs_ce,
+                            separate=configs["separate"]).to(device)
+            # print(model)
             self.attempts += 1
-            name = str(datetime.datetime.today()).replace(':', '-').replace('.', '-') + "-hyperparam-search"
+            name = str(datetime.datetime.today()).replace(':', '-').replace('.', '-') + "-hyperparam-search-with-bn"
             eval_losses, eval_accus, eval_f1s = \
                 train(model, train_loader=train_loader, val_loader=val_loader,
                   config=configs, device=device, max_epochs=configs["max_epochs"], eval_every=configs["eval_every"],
